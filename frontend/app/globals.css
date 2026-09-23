@@ -329,4 +329,28 @@ details[open] summary { margin-bottom: 8px; }
 .card-quote figcaption { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
 .card-quote blockquote { margin: 2px 0 0; font-size: 0.9375rem; font-style: italic; }
 
+.comparison-controls { margin: 0 0 20px; }
+.comparison-form { display: flex; flex-wrap: wrap; align-items: end; gap: 8px 12px; }
+.comparison-form label { flex-basis: 100%; }
+.comparison-form input { width: auto; min-width: 180px; }
+.comparison-form .btn { padding-block: 13px; }
+.comparison-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
+.comparison-grid .results { max-width: none; }
+.comparison-waiting { margin-bottom: 12px; }
+.card-different { border-color: var(--gate); border-left-color: var(--gate); box-shadow: 0 0 0 2px var(--gate-soft); }
+.difference-badge {
+  display: inline-flex;
+  margin-top: 8px;
+  padding: 3px 9px;
+  color: #76510c;
+  background: var(--gate-soft);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
 .form-missing { margin-top: 8px; }
+
+@media (max-width: 860px) {
+  .comparison-grid { grid-template-columns: 1fr; }
+}

@@ -1,7 +1,7 @@
 "use client";
 
 import ReactMarkdown from "react-markdown";
-import { HONESTY_TEXT, OUTCOME, REJECT_REASONS, RESULTS } from "@/lib/brand";
+import { DATE_COMPARISON, HONESTY_TEXT, OUTCOME, REJECT_REASONS, RESULTS } from "@/lib/brand";
 import {
   capitalize, explanations, factsLine, findSearchResult, kzt, outcomeKind, parseItems, quoteText,
   reasonCounts, suggestions,
@@ -25,14 +25,16 @@ function Card({
   text,
   writing,
   hideIdentity,
+  different,
 }: {
   card: ContractorCard;
   text: string | null;
   writing: boolean;
   hideIdentity: boolean;
+  different: boolean;
 }) {
   return (
-    <li className={`card${hideIdentity ? " card-identity-hidden" : ""}`}>
+    <li className={`card${hideIdentity ? " card-identity-hidden" : ""}${different ? " card-different" : ""}`}>
       <div className="card-head">
         <h3 className="card-name">{hideIdentity ? RESULTS.hiddenCardLabel : card.name}</h3>
         {!hideIdentity && (
@@ -43,6 +45,7 @@ function Card({
       </div>
       {!hideIdentity && <p className="card-meta">{card.categories.join(" · ")} · {card.city}</p>}
       <HonestyBadges card={card} />
+      {different && <span className="difference-badge">{DATE_COMPARISON.onlyOnThisDate}</span>}
       {text ? (
         <div className="card-why">
           <ReactMarkdown>{text}</ReactMarkdown>
@@ -146,11 +149,19 @@ export function Results({
   mock,
   identitiesHidden,
   onToggleIdentities,
+  title = RESULTS.title,
+  titleId = "results-title",
+  showIdentityToggle = true,
+  differingIds = new Set<string>(),
 }: {
   run: Run;
   mock: boolean;
   identitiesHidden: boolean;
   onToggleIdentities: () => void;
+  title?: string;
+  titleId?: string;
+  showIdentityToggle?: boolean;
+  differingIds?: ReadonlySet<string>;
 }) {
   const found = findSearchResult(run);
   if (!found) {
@@ -184,10 +195,10 @@ export function Results({
   const writing = run.status === "running";
 
   return (
-    <section className="results" aria-labelledby="results-title">
+    <section className="results" aria-labelledby={titleId}>
       <div className="results-head">
-        <h2 id="results-title">{RESULTS.title}</h2>
-        {found.cards.length > 0 && (
+        <h2 id={titleId}>{title}</h2>
+        {showIdentityToggle && found.cards.length > 0 && (
           <button className="btn-link" type="button" aria-pressed={identitiesHidden} onClick={onToggleIdentities}>
             {identitiesHidden ? RESULTS.showIdentities : RESULTS.hideIdentities}
           </button>
@@ -197,7 +208,14 @@ export function Results({
       {found.cards.length > 0 && (
         <ol className="cards">
           {found.cards.map((card, i) => (
-            <Card key={card.id} card={card} text={texts[i]} writing={writing} hideIdentity={identitiesHidden} />
+            <Card
+              key={card.id}
+              card={card}
+              text={texts[i]}
+              writing={writing}
+              hideIdentity={identitiesHidden}
+              different={differingIds.has(card.id)}
+            />
           ))}
         </ol>
       )}

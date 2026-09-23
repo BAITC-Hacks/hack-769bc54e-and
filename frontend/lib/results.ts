@@ -22,6 +22,13 @@ export function findSearchResult(run: Run): SearchResult | null {
   return null;
 }
 
+/** IDs present on only one of the two dates: these cards form the visible diff. */
+export function differingContractorIds(left: SearchResult, right: SearchResult): Set<string> {
+  const leftIds = new Set(left.cards.map((card) => card.id));
+  const rightIds = new Set(right.cards.map((card) => card.id));
+  return new Set([...leftIds].filter((id) => !rightIds.has(id)).concat([...rightIds].filter((id) => !leftIds.has(id))));
+}
+
 export interface ReportItem {
   /** Пусто, если модель не выделила имя жирным */
   name: string;

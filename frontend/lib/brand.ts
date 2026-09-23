@@ -151,3 +151,16 @@ export const HONESTY_TEXT = {
   imputedPrice: "Цена ориентировочная",
   imputedCity: "Город ориентировочный",
 } as const;
+
+export const DATE_COMPARISON = {
+  openButton: "А если другая дата?",
+  dateLabel: "Вторая дата",
+  compareButton: "Сравнить выдачу",
+  comparingButton: "Сравниваю",
+  sameDate: "Выберите дату, отличную от первой",
+  waiting: "Подбираем подрядчиков на вторую дату…",
+  failed: "Не удалось получить выдачу на вторую дату.",
+  firstTitle: (date: string) => `Выдача на ${date}`,
+  secondTitle: (date: string) => `Выдача на ${date}`,
+  onlyOnThisDate: "Только на этой дате",
+} as const;

@@ -4,7 +4,8 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Journal } from "@/components/Journal";
 import { Results } from "@/components/Results";
 import { api } from "@/lib/api";
-import { MISSING_LABELS, SUMMARY_LABELS, STATUS_TEXT, brand, buildRequestText } from "@/lib/brand";
+import { DATE_COMPARISON, MISSING_LABELS, SUMMARY_LABELS, STATUS_TEXT, brand, buildRequestText } from "@/lib/brand";
+import { differingContractorIds, findSearchResult } from "@/lib/results";
 import type { ContractorOptions, Health, Run } from "@/lib/types";
 
 interface RequestForm {
@@ -62,6 +63,11 @@ export default function Page() {
   const [deciding, setDeciding] = useState(false);
   const [error, setError] = useState("");
   const [identitiesHidden, setIdentitiesHidden] = useState(false);
+  const [comparisonOpen, setComparisonOpen] = useState(false);
+  const [comparisonDate, setComparisonDate] = useState("");
+  const [comparisonRun, setComparisonRun] = useState<Run | null>(null);
+  const [comparisonBusy, setComparisonBusy] = useState(false);
+  const [primaryRequest, setPrimaryRequest] = useState<RequestForm | null>(null);
   // После запуска форма уезжает: на проекторе журнал должен занимать весь экран
   const [collapsed, setCollapsed] = useState(false);
 
@@ -99,13 +105,40 @@ export default function Page() {
     return () => clearInterval(timer);
   }, [run?.id, active]);
 
+  const comparisonActive = comparisonRun &&
+    (comparisonRun.status === "running" || comparisonRun.status === "awaiting_approval");
+  useEffect(() => {
+    if (!comparisonRun?.id || !comparisonActive) return;
+    let failures = 0;
+    const timer = setInterval(() => {
+      api
+        .getRun(comparisonRun.id)
+        .then((fresh) => {
+          failures = 0;
+          setComparisonRun(fresh);
+        })
+        .catch((e: Error) => {
+          if (++failures >= 3) {
+            clearInterval(timer);
+            setError(`${e.message}. Опрос остановлен, обновите страницу.`);
+          }
+        });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [comparisonRun?.id, comparisonActive]);
+
   async function start(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!requiredComplete) return;
     setError("");
     setBusy(true);
     try {
-      setRun(await api.startRun(buildRequestText(form), ""));
+      const request = { ...form };
+      setRun(await api.startRun(buildRequestText(request), ""));
+      setPrimaryRequest(request);
+      setComparisonRun(null);
+      setComparisonOpen(false);
+      setComparisonDate("");
       setCollapsed(true);
     } catch (e) {
       setError((e as Error).message);
@@ -127,12 +160,40 @@ export default function Page() {
     }
   }
 
+  function openComparison() {
+    const next = new Date(`${primaryRequest?.date ?? form.date}T00:00:00Z`);
+    next.setUTCDate(next.getUTCDate() + 1);
+    setComparisonDate(next.toISOString().slice(0, 10));
+    setComparisonOpen(true);
+  }
+
+  async function compareDate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const request = primaryRequest ?? form;
+    if (!comparisonDate || comparisonDate === request.date || comparisonActive) return;
+    setError("");
+    setComparisonBusy(true);
+    try {
+      setComparisonRun(await api.startRun(buildRequestText({ ...request, date: comparisonDate }), ""));
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setComparisonBusy(false);
+    }
+  }
+
   const focused = !!run && collapsed;
   const shellClass = focused ? "shell shell-focused" : run ? "shell" : "shell shell-intro";
   const missing = (Object.keys(MISSING_LABELS) as (keyof typeof MISSING_LABELS)[]).filter((field) =>
     field === "budget" ? !(Number(form.budget) > 0) : !form[field],
   );
   const requiredComplete = missing.length === 0;
+  const primaryResult = run ? findSearchResult(run) : null;
+  const secondaryResult = comparisonRun ? findSearchResult(comparisonRun) : null;
+  const differingIds = primaryResult && secondaryResult
+    ? differingContractorIds(primaryResult, secondaryResult)
+    : new Set<string>();
+  const primaryDate = primaryRequest?.date ?? form.date;
 
   function update<K extends keyof RequestForm>(field: K, value: RequestForm[K]) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -256,12 +317,65 @@ export default function Page() {
               )}
             </div>
             {run.status === "done" && <Summary run={run} />}
-            <Results
-              run={run}
-              mock={!!health?.mock}
-              identitiesHidden={identitiesHidden}
-              onToggleIdentities={() => setIdentitiesHidden((hidden) => !hidden)}
-            />
+            {primaryResult && (
+              <div className="comparison-controls">
+                {!comparisonOpen ? (
+                  <button className="btn btn-quiet" type="button" disabled={!!active} onClick={openComparison}>
+                    {DATE_COMPARISON.openButton}
+                  </button>
+                ) : (
+                  <form className="comparison-form" onSubmit={compareDate}>
+                    <label htmlFor="comparison-date">{DATE_COMPARISON.dateLabel}</label>
+                    <input
+                      id="comparison-date"
+                      type="date"
+                      required
+                      value={comparisonDate}
+                      onChange={(event) => setComparisonDate(event.target.value)}
+                    />
+                    <button
+                      className="btn btn-quiet"
+                      type="submit"
+                      disabled={comparisonBusy || !!comparisonActive || !comparisonDate || comparisonDate === primaryDate}
+                    >
+                      {comparisonBusy || comparisonActive ? DATE_COMPARISON.comparingButton : DATE_COMPARISON.compareButton}
+                    </button>
+                    {comparisonDate === primaryDate && <span className="meta">{DATE_COMPARISON.sameDate}</span>}
+                  </form>
+                )}
+              </div>
+            )}
+            <div className={comparisonRun ? "comparison-grid" : undefined}>
+              <Results
+                run={run}
+                mock={!!health?.mock}
+                identitiesHidden={identitiesHidden}
+                onToggleIdentities={() => setIdentitiesHidden((hidden) => !hidden)}
+                title={comparisonRun ? DATE_COMPARISON.firstTitle(primaryDate) : undefined}
+                titleId="results-primary-title"
+                differingIds={differingIds}
+              />
+              {comparisonRun && (
+                <div className="comparison-column">
+                  {!secondaryResult && comparisonActive && (
+                    <p className="meta comparison-waiting">{DATE_COMPARISON.waiting}</p>
+                  )}
+                  {!secondaryResult && comparisonRun.status === "failed" && (
+                    <p className="error comparison-waiting">{DATE_COMPARISON.failed}</p>
+                  )}
+                  <Results
+                    run={comparisonRun}
+                    mock={!!health?.mock}
+                    identitiesHidden={identitiesHidden}
+                    onToggleIdentities={() => setIdentitiesHidden((hidden) => !hidden)}
+                    title={DATE_COMPARISON.secondTitle(comparisonDate)}
+                    titleId="results-comparison-title"
+                    showIdentityToggle={false}
+                    differingIds={differingIds}
+                  />
+                </div>
+              )}
+            </div>
             <Journal run={run} deciding={deciding} onDecide={decide} />
           </>
         ) : (
