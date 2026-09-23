@@ -7,3 +7,6 @@ node_modules/
 .next/
 .DS_Store
 *.tsbuildinfo
+
+# Личные заметки для Claude Code — в репозиторий не идут
+CLAUDE.md
