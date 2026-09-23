@@ -343,7 +343,7 @@ details[open] summary { margin-bottom: 8px; }
   background: var(--paper);
 }
 .rejected summary { cursor: pointer; font-weight: 600; }
-.rejected > ol { margin: 12px 0 0; padding-left: 22px; }
+.rejected > ol { margin: 12px 0 0; padding-left: 22px; max-height: 24rem; overflow-y: auto; }
 .rejected > ol > li + li { margin-top: 10px; }
 .rejected ul { margin: 3px 0 0; padding-left: 18px; color: var(--muted); font-size: 0.875rem; }
 

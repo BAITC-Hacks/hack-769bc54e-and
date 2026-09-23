@@ -111,7 +111,11 @@ export const RESULTS = {
   hideIdentities: "Скрыть имена",
   showIdentities: "Показать имена",
   hiddenCardLabel: "Объяснение без имени",
-  rejectedTitle: (count: number) => `Ещё ${count} кандидатов не прошли`,
+  rejectedTitle: (count: number) => {
+    const singular = count % 10 === 1 && count % 100 !== 11;
+    const few = count % 10 >= 2 && count % 10 <= 4 && (count % 100 < 12 || count % 100 > 14);
+    return `Ещё ${count} ${singular ? "кандидат не прошёл" : few ? "кандидата не прошли" : "кандидатов не прошли"}`;
+  },
   hiddenRejectedLabel: (position: number) => `Кандидат ${position}`,
   responseTime: (seconds: number) => `Ответ за ${seconds.toFixed(1)} с`,
 } as const;

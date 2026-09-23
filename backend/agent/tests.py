@@ -223,6 +223,17 @@ class ContractorDomainTests(TestCase):
         codes = {r["code"] for entry in rejected for r in entry["reasons"]}
         self.assertEqual(codes, {"busy", "budget"})
 
+    def test_rejected_includes_every_filtered_candidate(self):
+        result = self.search(date="2026-10-15", budget_kzt=400000)
+        expected = {p["id"] for p in self.m.catalog()
+                    if p["city"] == "Алматы" and "Ведущий" in p["categories"]}
+        self.assertGreater(len(expected), 8)
+        self.assertEqual({entry["id"] for entry in result["rejected"]}, expected)
+        self.assertEqual(len(result["rejected"]), result["in_city_and_category"] - result["passed_filters"])
+        for entry in result["rejected"]:
+            self.assertIn("budget", {reason["code"] for reason in entry["reasons"]})
+            self.assertTrue(all(reason["detail"] for reason in entry["reasons"]))
+
     def test_profile_without_max_hours_survives_duration_filter(self):
         florist = next(p for p in self.m.catalog() if p["max_hours"] is None)
         req = dict(city=florist["city"], category=florist["categories"][0], date="2026-12-31",

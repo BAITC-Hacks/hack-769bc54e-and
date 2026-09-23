@@ -28,7 +28,6 @@ WINDOW_START = dt.date(2026, 9, 23)
 WINDOW_END = dt.date(2026, 12, 31)
 
 MAX_CARDS = 3
-MAX_REJECTED_SHOWN = 8
 SHIFT_DAYS = 14  # насколько двигаем дату при диагностике
 
 # Веса скоринга. Фиксированные и опубликованные: от них зависит порядок карточек,
@@ -734,7 +733,7 @@ def search_contractors(
             else f"Подходящих не нашлось. {availability[0].upper()}{availability[1:]}"
         ),
         "cards": cards,
-        "rejected": rejected[:MAX_REJECTED_SHOWN],
+        "rejected": rejected,
         "rejected_by_reason": _count_reasons(rejected),
     }
     if out_of_window:
