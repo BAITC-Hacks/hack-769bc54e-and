@@ -55,6 +55,19 @@ export function buildRequestText(request: ContractorRequestText): string {
   return `Подбери подрядчиков. ${parts.join(". ")}.`;
 }
 
+/** Подписи блока с карточками подбора. */
+export const RESULTS = {
+  title: "Кого подобрали",
+  count: (shown: number, passed: number, total: number) =>
+    `Подходят ${passed} из ${total} в этой категории и городе · показано ${shown}`,
+  priceUnknown: "цена не указана",
+  pricePrefix: "от",
+  writing: "Модель пишет объяснение…",
+  factsNote: "Без модели: собрано из фактов каталога",
+  quoteLabel: "Из описания подрядчика",
+  modelText: "Текст ответа модели",
+} as const;
+
 /** Подписи полоски итогов. Цифры под ними — главный аргумент в питче. */
 export const SUMMARY_LABELS = {
   time: "Время",

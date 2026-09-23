@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { Journal } from "@/components/Journal";
+import { Results } from "@/components/Results";
 import { api } from "@/lib/api";
 import { SUMMARY_LABELS, STATUS_TEXT, brand, buildRequestText } from "@/lib/brand";
 import type { ContractorOptions, Health, Run } from "@/lib/types";
@@ -236,6 +237,7 @@ export default function Page() {
               )}
             </div>
             {run.status === "done" && <Summary run={run} />}
+            <Results run={run} mock={!!health?.mock} />
             <Journal run={run} deciding={deciding} onDecide={decide} />
           </>
         ) : (

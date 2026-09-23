@@ -1,6 +1,7 @@
 "use client";
 
 import ReactMarkdown from "react-markdown";
+import { RESULTS } from "@/lib/brand";
 import type { Run, Step } from "@/lib/types";
 
 const KIND_LABEL: Record<Step["kind"], string> = {
@@ -25,11 +26,15 @@ function offset(step: Step, startedAt: string) {
 function StepBody({ step }: { step: Step }) {
   const c = step.content;
   if (step.kind === "thought") return <p className="step-text">{String(c.text ?? "")}</p>;
+  // Главное из ответа уже показано карточками над журналом — здесь исходный текст, свёрнутым
   if (step.kind === "final")
     return (
-      <div className="report">
-        <ReactMarkdown>{String(c.text ?? "")}</ReactMarkdown>
-      </div>
+      <details>
+        <summary>{RESULTS.modelText}</summary>
+        <div className="report">
+          <ReactMarkdown>{String(c.text ?? "")}</ReactMarkdown>
+        </div>
+      </details>
     );
   if (step.kind === "tool_call") return <pre className="data">{`${step.title}(${c.args && Object.keys(c.args as object).length ? pretty(c.args) : ""})`}</pre>;
   if (step.kind === "tool_result")
