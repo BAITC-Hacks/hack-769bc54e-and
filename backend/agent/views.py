@@ -3,7 +3,7 @@ import json
 from django.conf import settings
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
-from django.views.decorators.http import require_GET, require_http_methods, require_POST
+from django.views.decorators.http import require_GET, require_POST
 
 from .core import domains, loop
 from .models import Run
@@ -54,10 +54,8 @@ def samples(request):
     return JsonResponse(domains.active().SAMPLES, safe=False)
 
 
-@require_http_methods(["GET", "POST"])
+@require_POST
 def runs(request):
-    if request.method == "GET":
-        return JsonResponse([_run_json(r, with_steps=False) for r in Run.objects.all()[:20]], safe=False)
     data = _body(request)
     task = (data.get("task") or "").strip()
     if not task:

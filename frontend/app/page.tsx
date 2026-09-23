@@ -21,7 +21,7 @@ export default function Page() {
     api
       .health()
       .then(setHealth)
-      .catch(() => setError("Бэкенд недоступен. Запустите его: make backend (порт 8000)."));
+      .catch(() => setError("Бэкенд недоступен. Запустите его: python scripts/dev.py backend (порт 8000)."));
   }, []);
 
   // Пока агент работает — опрашиваем раз в секунду. Проще и надёжнее SSE/WebSocket для одного дня.
