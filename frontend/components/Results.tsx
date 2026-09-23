@@ -3,7 +3,7 @@
 import ReactMarkdown from "react-markdown";
 import { DATE_COMPARISON, HONESTY_TEXT, OUTCOME, REJECT_REASONS, RESULTS } from "@/lib/brand";
 import {
-  capitalize, explanations, factsLine, findSearchResult, kzt, outcomeKind, parseItems, quoteText,
+  capitalize, explanations, factsLine, findSearchResult, kzt, outcomeKind, parseItems,
   reasonCounts,
 } from "@/lib/results";
 import type { ContractorCard, Run, SearchResult } from "@/lib/types";
@@ -61,7 +61,7 @@ function Card({
       {card.match.quote && (
         <figure className="card-quote">
           <figcaption>{RESULTS.quoteLabel}</figcaption>
-          <blockquote>«{quoteText(card.match.quote)}»</blockquote>
+          <blockquote>«{card.match.quote}»</blockquote>
         </figure>
       )}
     </li>

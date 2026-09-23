@@ -78,9 +78,6 @@ export function explanations(cards: ContractorCard[], items: ReportItem[]): (str
 
 export const kzt = (n: number) => `${n.toLocaleString("ru-RU")} ₸`;
 
-/** Цитата обрезана бэкендом по длине — многоточие показывает, что фраза не закончена. */
-export const quoteText = (quote: string) => (/[.!?…»]$/.test(quote) ? quote : `${quote}…`);
-
 /**
  * Объяснение без модели — только из посчитанных фактов. Нужно в mock-режиме: проверяющий
  * без ключей видит настоящий отбор, и карточка без объяснения выглядела бы сломанной.

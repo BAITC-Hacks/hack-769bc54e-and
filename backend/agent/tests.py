@@ -276,13 +276,10 @@ class ContractorDomainTests(TestCase):
         self.assertEqual(d["category_available_in"], ["Алматы"])
 
     def test_quote_is_always_a_real_fragment_of_the_description(self):
-        for card in self.search(date="2026-10-15")["cards"]:  # A16
-            quote = card["match"]["quote"]
-            if quote is None:
-                continue
-            profile = next(p for p in self.m.catalog() if p["id"] == card["id"])
-            # Первая буква могла быть поднята в верхний регистр: фрагмент вырван из середины
-            self.assertIn(quote.rstrip(".").lower(), profile["description"].lower())
+        for profile in self.m.catalog():  # W5 / A16: includes uppercase and mid-sentence quotes.
+            quote = self.m._quote(profile["description"], set(), fallback={"ведущ"})
+            if quote is not None:
+                self.assertIn(quote, profile["description"], profile["id"])
 
     def test_words_echoed_from_the_request_are_not_counted_as_a_match(self):
         card = self.search(date="2026-10-15", free_text="ведущий на свадьбу в Алматы")["cards"][0]

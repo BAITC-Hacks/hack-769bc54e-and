@@ -359,12 +359,7 @@ def _quote(description: str, signal: set[str], fallback: set[str] | None = None)
         quote = quote[:QUOTE_MAX_CHARS].rsplit(" ", 1)[0]
     if quote not in description:
         return None
-    letters = [c for c in quote if c.isalpha()]
-    if letters and sum(c.isupper() for c in letters) / len(letters) > 0.3:
-        # Описание целиком капсом — не повод остаться без доказательства.
-        # Приводим к обычному виду; дословность проверяется без учёта регистра.
-        quote = quote.lower()
-    return quote[0].upper() + quote[1:] if quote[:1].islower() else quote
+    return quote
 
 
 def _reasons(profile: dict, req: dict) -> list[dict]:
