@@ -428,3 +428,22 @@ python scripts/dev.py eval      # прогон кейсов, отчёт в docs/
 `docs/HOURLY.md` — почасовой журнал работы · `docs/EVAL.md` — результаты прогона · `docs/TEAM_WORKFLOW.md` — как работаем втроём ·
 `docs/DEMO_CHECKLIST.md` — сценарий демонстрации · `docs/PITCH.md` — заготовка питча ·
 `docs/DATASET_NOTES.md` — что мы нашли в датасете.
+
+## Критерии оценки → где это в решении
+
+Пять критериев технического отбора Задачи и где эксперт найдёт каждый: в коде, в демо
+и в проверках. Запросы из столбца «В демо» — из раздела «Порядок проверки основного
+сценария работы».
+
+| Критерий | В коде | В демо | Чем проверено |
+|---|---|---|---|
+| **Соответствие задаче и работоспособность** (25) | вход и жёсткие фильтры — `search_contractors`, `_reasons` в [contractors.py](backend/agent/core/domains/contractors.py); не больше трёх карточек — `MAX_CARDS`; исходы — поле `outcome`; интерфейс — [Results.tsx](frontend/components/Results.tsx) | пять запросов из таблицы проверки: полная выдача, меньше трёх, редкая категория, никто не подошёл, нет в каталоге; «А если другая дата?» — две выдачи рядом | `test_never_more_than_three_cards`, `test_busy_contractor_is_excluded`, `test_three_outcomes_are_distinguishable`, `test_two_dates_give_different_results` в [tests.py](backend/agent/tests.py); `python scripts/verify.py` → `OK` |
+| **Техническая реализация, AI и agentic AI** (25) | цикл агента — [loop.py](backend/agent/core/loop.py), реестр инструментов — [tools.py](backend/agent/core/tools.py), единственный вызов модели — [llm.py](backend/agent/core/llm.py); модель сама вызывает `search_contractors` и `diagnose_request`, а объяснения пишет по формату `REPORT_FORMAT`; порядок задаёт код — `_score`, `WEIGHTS` | журнал справа: рассуждение → вызов инструмента → результат → ответ; повторный запуск даёт тот же порядок | `test_order_is_deterministic`, `test_equal_scores_are_ordered_by_meaning_not_by_id`, `test_ranking_uses_the_human_text_not_the_model_argument`; 10 из 10 кейсов на настоящей модели — [EVAL.md](docs/EVAL.md) |
+| **README и воспроизводимость** (25) | датасет в репозитории — [contractors.csv](backend/agent/data/contractors.csv); mock-режим без ключей — `LLM_MOCK` в [llm.py](backend/agent/core/llm.py); команды без `make` — [dev.py](scripts/dev.py); сквозная проверка — [verify.py](scripts/verify.py) | `docker compose up --build` из чистого клона без `.env`, затем `python scripts/verify.py` | `python scripts/dev.py check`: тесты Django и `tsc --noEmit`; двенадцать допущений с тестами — раздел «Принятые допущения» |
+| **Ценность и применимость** (15) | факты для объяснения — `_score`; цитата-доказательство — `_quote`; чем кандидат отличается от соседей — `_standouts`; что изменить в запросе — `_suggestions`, `_nearby_dates`, `_budget_needed`; сезон — `_season_note`; плашки честности — `flags` и `HonestyBadges` в [Results.tsx](frontend/components/Results.tsx) | «Ведущий, 15.10»: у каждой карточки своё объяснение — цена относительно бюджета, форматы, языки — и цитата из описания; «Отель, 26.12»: почему никого нет и что сделать; «Скрыть имена» — карточки различимы по одним объяснениям | `test_quote_is_always_a_real_fragment_of_the_description`, `test_cards_carry_comparative_facts`, `test_diagnosis_names_the_budget_that_would_help`, `test_suggestions_never_offer_what_is_already_shown`, `test_cards_carry_honesty_flags` |
+| **Потенциал развития и оригинальность** (10) | диагностика «сдвиньте одно условие» — `_diagnose`, `_relaxed`; смена провайдера и self-hosted модель — одна строка `OPENAI_BASE_URL` (раздел «Параметры окружения»); новая Задача — новый файл в [domains/](backend/agent/core/domains/) | «Ведущий, 26.12» против «15.10»: одна карточка вместо трёх, подсказка перенести дату и сезонная заметка | `test_diagnosis_reports_when_no_single_change_helps`, `test_exhausted_rare_category_says_so_instead_of_advising`, `test_availability_note_differs_between_dates` |
+
+**Куда развивать.** Релевантность описания через эмбеддинги вместо основ слов — ТЗ это
+разрешает, и отбор останется детерминированным, если посчитать векторы заранее. Подбор
+комплекта одного уровня: ведущий, фотограф и зал под общий бюджет. Для этого подбор по
+одной категории уже даёт всё нужное — факты, диагностику и честные исходы.
