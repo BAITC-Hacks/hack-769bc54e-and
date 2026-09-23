@@ -10,6 +10,17 @@ import {
 import { differingContractorIds, findSearchResult } from "@/lib/results";
 import type { ContractorOptions, Health, Run } from "@/lib/types";
 
+/** Звёздочка у обязательного поля. Для скринридера поле и так помечено required,
+ *  поэтому символ прячем и даём текстовое пояснение. */
+function Required() {
+  return (
+    <>
+      <span className="required-mark" aria-hidden="true">*</span>
+      <span className="visually-hidden"> — {brand.requiredHint}</span>
+    </>
+  );
+}
+
 interface RequestForm {
   city: string;
   category: string;
@@ -210,34 +221,37 @@ export default function Page() {
         </header>
 
         <form className="request-form" onSubmit={start}>
+          <p className="meta required-legend">
+            <span className="required-mark" aria-hidden="true">*</span> {brand.requiredLegend}
+          </p>
           <div className="field-grid">
             <div className="field">
-              <label htmlFor="city">{brand.cityLabel}</label>
+              <label htmlFor="city">{brand.cityLabel}<Required /></label>
               <select id="city" required value={form.city} onChange={(e) => update("city", e.target.value)}>
                 <option value="">{brand.requiredPlaceholder}</option>
                 {options?.cities.map((value) => <option key={value}>{value}</option>)}
               </select>
             </div>
             <div className="field">
-              <label htmlFor="category">{brand.categoryLabel}</label>
+              <label htmlFor="category">{brand.categoryLabel}<Required /></label>
               <select id="category" required value={form.category} onChange={(e) => update("category", e.target.value)}>
                 <option value="">{brand.requiredPlaceholder}</option>
                 {options?.categories.map((value) => <option key={value}>{value}</option>)}
               </select>
             </div>
             <div className="field">
-              <label htmlFor="date">{brand.dateLabel}</label>
+              <label htmlFor="date">{brand.dateLabel}<Required /></label>
               <input id="date" type="date" required value={form.date} onChange={(e) => update("date", e.target.value)} />
             </div>
             <div className="field">
-              <label htmlFor="event-format">{brand.eventFormatLabel}</label>
+              <label htmlFor="event-format">{brand.eventFormatLabel}<Required /></label>
               <select id="event-format" required value={form.eventFormat} onChange={(e) => update("eventFormat", e.target.value)}>
                 <option value="">{brand.requiredPlaceholder}</option>
                 {options?.event_formats.map((value) => <option key={value}>{value}</option>)}
               </select>
             </div>
             <div className="field field-wide">
-              <label htmlFor="budget">{brand.budgetLabel}</label>
+              <label htmlFor="budget">{brand.budgetLabel}<Required /></label>
               <input
                 id="budget"
                 type="number"

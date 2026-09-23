@@ -368,6 +368,21 @@ details[open] summary { margin-bottom: 8px; }
 }
 
 .form-missing { margin-top: 8px; }
+.required-mark { color: var(--threat); font-weight: 700; margin-left: 2px; }
+.required-legend { margin-bottom: 12px; }
+.required-legend .required-mark { margin: 0 2px 0 0; }
+
+/* Текст только для скринридера: звёздочку он не читает, а знать про обязательность нужно */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 
 @media (max-width: 860px) {
   .comparison-grid { grid-template-columns: 1fr; }
