@@ -266,3 +266,5 @@ details[open] summary { margin-bottom: 8px; }
 .card-quote { margin: 12px 0 0; padding: 8px 0 8px 14px; border-left: 2px solid var(--line); }
 .card-quote figcaption { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
 .card-quote blockquote { margin: 2px 0 0; font-size: 0.9375rem; font-style: italic; }
+
+.form-missing { margin-top: 8px; }

@@ -21,6 +21,9 @@ export const brand = {
   optionalPlaceholder: "Не важно",
   budgetPlaceholder: "Например, 900000",
   durationPlaceholder: "Например, 5",
+  wishesLabel: "Пожелания (необязательно)",
+  wishesPlaceholder: "Например: драйв и энергия, без банальных конкурсов",
+  missingPrefix: "Осталось заполнить:",
   optionsError: "Не удалось загрузить варианты формы.",
   startButton: "Подобрать подрядчиков",
   startingButton: "Подбираю",
@@ -39,20 +42,28 @@ export interface ContractorRequestText {
   budget: string;
   duration: string;
   language: string;
+  wishes: string;
 }
 
-/** The agent still accepts prose, so the structured form produces one stable request. */
+/**
+ * The agent still accepts prose, so the structured form produces one stable request.
+ * Без подписей полей («Город:», «Формат:»): бэкенд ищет общие слова запроса и описания,
+ * и подпись совпала бы с описанием как ложный признак — а это меняет и объяснение, и порядок.
+ * «мероприятие», «бюджет», «тенге», «хочу» — в стоп-листе бэкенда. Пожелания идут последними:
+ * только по ним и должна считаться релевантность описания.
+ */
 export function buildRequestText(request: ContractorRequestText): string {
   const parts = [
-    `Город: ${request.city}`,
-    `Категория: ${request.category}`,
-    `Дата: ${request.date}`,
-    `Формат мероприятия: ${request.eventFormat}`,
-    `Бюджет на подрядчика: ${request.budget} ₸`,
+    `Подбор: ${request.category}`,
+    request.city,
+    request.date,
+    `мероприятие — ${request.eventFormat}`,
+    `бюджет ${Number(request.budget)} тенге`,
   ];
-  if (request.duration) parts.push(`Длительность: ${request.duration} ч`);
-  if (request.language) parts.push(`Язык: ${request.language}`);
-  return `Подбери подрядчиков. ${parts.join(". ")}.`;
+  if (request.duration) parts.push(`${Number(request.duration)} ч`);
+  if (request.language) parts.push(request.language);
+  const wishes = request.wishes.trim();
+  return `${parts.join(", ")}.${wishes ? ` Хочу: ${wishes}` : ""}`;
 }
 
 /** Подписи блока с карточками подбора. */
@@ -66,6 +77,15 @@ export const RESULTS = {
   factsNote: "Без модели: собрано из фактов каталога",
   quoteLabel: "Из описания подрядчика",
   modelText: "Текст ответа модели",
+} as const;
+
+/** Как называть незаполненное обязательное поле в подсказке под кнопкой. */
+export const MISSING_LABELS = {
+  city: "город",
+  category: "категорию",
+  date: "дату",
+  eventFormat: "формат",
+  budget: "бюджет",
 } as const;
 
 /** Подписи полоски итогов. Цифры под ними — главный аргумент в питче. */

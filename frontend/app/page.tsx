@@ -4,7 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Journal } from "@/components/Journal";
 import { Results } from "@/components/Results";
 import { api } from "@/lib/api";
-import { SUMMARY_LABELS, STATUS_TEXT, brand, buildRequestText } from "@/lib/brand";
+import { MISSING_LABELS, SUMMARY_LABELS, STATUS_TEXT, brand, buildRequestText } from "@/lib/brand";
 import type { ContractorOptions, Health, Run } from "@/lib/types";
 
 interface RequestForm {
@@ -15,6 +15,7 @@ interface RequestForm {
   budget: string;
   duration: string;
   language: string;
+  wishes: string;
 }
 
 const EMPTY_FORM: RequestForm = {
@@ -25,6 +26,7 @@ const EMPTY_FORM: RequestForm = {
   budget: "",
   duration: "",
   language: "",
+  wishes: "",
 };
 
 /** Итог запуска цифрами. Это то, что называют в питче: «столько-то вместо столько-то». */
@@ -98,7 +100,7 @@ export default function Page() {
 
   async function start(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!form.city || !form.category || !form.date || !form.eventFormat || !form.budget) return;
+    if (!requiredComplete) return;
     setError("");
     setBusy(true);
     try {
@@ -126,9 +128,10 @@ export default function Page() {
 
   const focused = !!run && collapsed;
   const shellClass = focused ? "shell shell-focused" : run ? "shell" : "shell shell-intro";
-  const requiredComplete = !!(
-    form.city && form.category && form.date && form.eventFormat && Number(form.budget) > 0
+  const missing = (Object.keys(MISSING_LABELS) as (keyof typeof MISSING_LABELS)[]).filter((field) =>
+    field === "budget" ? !(Number(form.budget) > 0) : !form[field],
   );
+  const requiredComplete = missing.length === 0;
 
   function update<K extends keyof RequestForm>(field: K, value: RequestForm[K]) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -175,7 +178,7 @@ export default function Page() {
                 id="budget"
                 type="number"
                 min="1"
-                step="1000"
+                step="1"
                 required
                 value={form.budget}
                 placeholder={brand.budgetPlaceholder}
@@ -201,11 +204,26 @@ export default function Page() {
                 {options?.languages.map((value) => <option key={value}>{value}</option>)}
               </select>
             </div>
+            <div className="field field-wide">
+              <label htmlFor="wishes">{brand.wishesLabel}</label>
+              <textarea
+                id="wishes"
+                rows={2}
+                value={form.wishes}
+                placeholder={brand.wishesPlaceholder}
+                onChange={(e) => update("wishes", e.target.value)}
+              />
+            </div>
           </div>
 
           <button className="btn btn-primary" type="submit" disabled={busy || !requiredComplete || !!active}>
             {busy ? brand.startingButton : brand.startButton}
           </button>
+          {!requiredComplete && (
+            <p className="meta form-missing">
+              {brand.missingPrefix} {missing.map((field) => MISSING_LABELS[field]).join(", ")}
+            </p>
+          )}
         </form>
 
         {error && <p className="error" role="alert">{error}</p>}
