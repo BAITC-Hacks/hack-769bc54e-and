@@ -150,3 +150,103 @@ class ApiTests(TestCase):
 
     def test_health_hides_model_name_in_mock_mode(self):
         self.assertIsNone(Client().get("/api/health").json()["model"])
+
+
+@override_settings(AGENT_DOMAIN="contractors")
+class ContractorDomainTests(TestCase):
+    """Домен Задачи #79-lite. Номера в названиях — требования из CLAUDE.md."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        from .core.domains import contractors
+
+        cls.m = contractors
+        cls.ctx = tools.RunContext(run_id="t", input_text="")
+        cls.base = dict(
+            city="Алматы", category="Ведущий", date="2026-11-14",
+            event_format="свадьба", budget_kzt=900000, free_text="ведущий на свадьбу",
+        )
+
+    def setUp(self):
+        load("contractors")
+
+    def search(self, **over):
+        return self.m.search_contractors(self.ctx, **dict(self.base, **over))
+
+    def test_catalog_has_66_profiles(self):
+        self.assertEqual(len(self.m.catalog()), 66)  # R20
+
+    def test_never_more_than_three_cards(self):
+        self.assertLessEqual(len(self.search(date="2026-10-15")["cards"]), 3)  # R3
+
+    def test_busy_contractor_is_excluded(self):
+        busy = next(p for p in self.m.catalog() if p["city"] == "Алматы" and "Ведущий" in p["categories"] and p["busy_dates"])
+        day = sorted(busy["busy_dates"])[0]
+        ids = [c["id"] for c in self.search(date=day)["cards"]]
+        self.assertNotIn(busy["id"], ids)  # R8
+
+    def test_order_is_deterministic(self):
+        runs = {tuple(c["id"] for c in self.search()["cards"]) for _ in range(5)}
+        self.assertEqual(len(runs), 1)  # R11
+
+    def test_three_outcomes_are_distinguishable(self):  # R12
+        self.assertEqual(self.search(date="2026-10-15")["outcome"], "matched")
+        self.assertEqual(
+            self.search(city="Астана", category="Лайв-бэнд")["outcome"], "no_category_in_city"
+        )
+        self.assertEqual(
+            self.search(category="Отель", date="2026-12-26", budget_kzt=3000000)["outcome"],
+            "all_filtered_out",
+        )
+
+    def test_two_dates_give_different_results(self):
+        a = self.search(date="2026-10-15")["passed_filters"]
+        b = self.search(date="2026-12-26")["passed_filters"]
+        self.assertNotEqual(a, b)  # R16
+
+    def test_rejected_lists_every_reason_not_just_the_first(self):
+        rejected = self.search(category="Отель", date="2026-12-26", budget_kzt=3000000)["rejected"]
+        codes = {r["code"] for entry in rejected for r in entry["reasons"]}
+        self.assertEqual(codes, {"busy", "budget"})
+
+    def test_profile_without_max_hours_survives_duration_filter(self):
+        florist = next(p for p in self.m.catalog() if p["max_hours"] is None)
+        req = dict(city=florist["city"], category=florist["categories"][0], date="2026-12-31",
+                   event_format=florist["event_formats"][0], budget_kzt=10**9, duration_hours=12)
+        rejected = self.m.search_contractors(self.ctx, **req)["rejected"]
+        blocked = {e["id"] for e in rejected for r in e["reasons"] if r["code"] == "duration"}
+        self.assertNotIn(florist["id"], blocked)  # I1
+
+    def test_category_filter_matches_any_of_the_profile_categories(self):
+        multi = next((p for p in self.m.catalog() if len(p["categories"]) > 1), None)
+        if multi is None:
+            self.skipTest("в датасете нет профилей с несколькими категориями")
+        for category in multi["categories"]:  # I2
+            pool = self.m._shortlist({"city": multi["city"], "category": category})[0]
+            self.assertIn(multi["id"], {p["id"] for p in pool})
+
+    def test_date_outside_the_calendar_window_is_flagged(self):
+        self.assertIn("warning", self.search(date="2027-03-01"))  # I6
+
+    def test_cards_carry_honesty_flags(self):
+        card = self.search(date="2026-10-15")["cards"][0]
+        self.assertEqual(set(card["flags"]), {"synthetic", "price_imputed", "city_imputed"})  # R22
+
+    def test_bad_date_returns_error_not_crash(self):
+        self.assertIn("error", self.search(date="14 ноября"))
+
+    def test_diagnosis_reports_when_no_single_change_helps(self):
+        d = self.m.diagnose_request(self.ctx, **dict(self.base, category="Отель",
+                                                     date="2026-12-26", budget_kzt=3000000))
+        self.assertFalse(d["single_change_helps"])
+        self.assertEqual(d["blocked_by"], {"busy": 2, "budget": 2})
+
+    def test_diagnosis_names_the_budget_that_would_help(self):
+        d = self.m.diagnose_request(self.ctx, **dict(self.base, date="2026-10-15", budget_kzt=400000))
+        self.assertTrue(d["single_change_helps"])
+        self.assertEqual(d["budget_needed_kzt"], 650000)
+
+    def test_diagnosis_says_where_the_category_exists(self):
+        d = self.m.diagnose_request(self.ctx, **dict(self.base, city="Астана", category="Лайв-бэнд"))
+        self.assertEqual(d["category_available_in"], ["Алматы"])

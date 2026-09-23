@@ -83,9 +83,12 @@ _NO_USAGE = {"prompt": 0, "completion": 0}
 
 
 def _replay(messages) -> tuple[str, dict]:
-    """Сырой материал и результаты уже выполненных инструментов: {имя: результат}."""
+    """Текст запроса и результаты уже выполненных инструментов: {имя: результат}.
+
+    Когда сырой материал есть — домену интереснее его превью, когда нет — сама задача.
+    """
     user = next(m["content"] for m in messages if m["role"] == "user")
-    raw = user.split("<raw_material>")[-1] if "<raw_material>" in user else ""
+    raw = user.split("<raw_material>")[-1] if "<raw_material>" in user else user
     names, results = {}, {}
     for m in messages:
         for tc in m.get("tool_calls") or []:

@@ -1,0 +1,35 @@
+[
+  {
+    "id": "dense-wedding",
+    "task": "Нужен ведущий на свадьбу в Алматы 15 октября 2026, бюджет 900000 тенге.",
+    "expect": {
+      "tools": ["search_contractors"],
+      "contains": ["%"],
+      "absent": ["отличный выбор"]
+    }
+  },
+  {
+    "id": "all-busy-and-pricey",
+    "task": "Подбери отель в Алматы на свадьбу 26 декабря 2026, бюджет 3000000 тенге.",
+    "expect": {
+      "tools": ["search_contractors", "diagnose_request"],
+      "contains": ["занят"]
+    }
+  },
+  {
+    "id": "no-category-in-city",
+    "task": "Нужен лайв-бэнд в Астане на корпоратив 20 ноября 2026, бюджет 1500000 тенге.",
+    "expect": {
+      "tools": ["search_contractors", "diagnose_request"],
+      "contains": ["Алматы"]
+    }
+  },
+  {
+    "id": "over-budget",
+    "task": "Нужен ведущий на свадьбу в Алматы 15 октября 2026, бюджет 400000 тенге.",
+    "expect": {
+      "tools": ["search_contractors", "diagnose_request"],
+      "contains": ["650"]
+    }
+  }
+]

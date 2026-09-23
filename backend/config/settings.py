@@ -42,7 +42,7 @@ TIME_ZONE = "Asia/Almaty"
 
 # --- Agent ---
 # Предметная область = модуль в agent/core/domains/. Смена трека = смена этого значения.
-AGENT_DOMAIN = os.getenv("AGENT_DOMAIN", "example")
+AGENT_DOMAIN = os.getenv("AGENT_DOMAIN", "contractors")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 # Адрес задаём всегда явно. Пустую переменную окружения SDK принимает за адрес
 # и падает с UnsupportedProtocol, поэтому пустое значение заменяем значением по умолчанию.

@@ -60,7 +60,14 @@ def check(case: dict, run) -> tuple[bool, list[str]]:
 
 
 def load_cases(limit: int | None) -> list[dict]:
-    cases = json.loads((HERE / "cases.json").read_text(encoding="utf-8"))
+    """Кейсы активного домена: cases.<домен>.json, иначе общий cases.json."""
+    from django.conf import settings
+
+    path = HERE / f"cases.{settings.AGENT_DOMAIN}.json"
+    if not path.exists():
+        path = HERE / "cases.json"
+    print(f"кейсы: {path.name}")
+    cases = json.loads(path.read_text(encoding="utf-8"))
     for case in cases:
         if "input_file" in case:
             case["input"] = (HERE / case["input_file"]).read_text(encoding="utf-8")
