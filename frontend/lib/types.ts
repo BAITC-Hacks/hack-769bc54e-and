@@ -26,6 +26,13 @@ export interface Sample {
   input: string;
 }
 
+export interface ContractorOptions {
+  cities: string[];
+  categories: string[];
+  event_formats: string[];
+  languages: string[];
+}
+
 export interface Health {
   ok: boolean;
   mock: boolean;

@@ -1,4 +1,4 @@
-import type { Health, Run, Sample } from "./types";
+import type { ContractorOptions, Health, Run, Sample } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -17,6 +17,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   health: () => request<Health>("/health"),
+  options: () => request<ContractorOptions>("/options"),
   samples: () => request<Sample[]>("/samples"),
   startRun: (task: string, input: string) =>
     request<Run>("/runs", { method: "POST", body: JSON.stringify({ task, input }) }),

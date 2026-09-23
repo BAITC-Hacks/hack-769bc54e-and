@@ -54,6 +54,38 @@ def samples(request):
     return JsonResponse(domains.active().SAMPLES, safe=False)
 
 
+@require_GET
+def options(request):
+    """Return form dictionaries derived from the active domain catalog."""
+    catalog = getattr(domains.active(), "catalog", None)
+    if not callable(catalog):
+        return JsonResponse({"error": "active domain does not provide catalog options"}, status=404)
+
+    profiles = catalog()
+
+    def unique(field):
+        values = {
+            value
+            for profile in profiles
+            for value in (
+                profile.get(field, [])
+                if isinstance(profile.get(field), (list, tuple, set, frozenset))
+                else [profile.get(field)]
+            )
+            if value
+        }
+        return sorted(values, key=str.casefold)
+
+    return JsonResponse(
+        {
+            "cities": unique("city"),
+            "categories": unique("categories"),
+            "event_formats": unique("event_formats"),
+            "languages": unique("languages"),
+        }
+    )
+
+
 @require_POST
 def runs(request):
     data = _body(request)
