@@ -16,6 +16,8 @@
         "tools": ["имя_инструмента", ...],  // какие инструменты обязан вызвать
         "contains": ["подстрока", ...],     // что обязано быть в отчёте
         "absent": ["подстрока", ...],       // чего в отчёте быть не должно
+        "tool_result_contains": ["..."],    // что обязано быть в ответе инструмента,
+                                            // а не в тексте модели: детерминированная гарантия
         "approval": true                     // обязан ли остановиться на подтверждении
       },
       "compare": {                           // необязательно: второй запрос для сравнения
@@ -55,6 +57,16 @@ def check(case: dict, run) -> tuple[bool, list[str]]:
     for needle in expect.get("absent", []):
         if needle.lower() in report.lower():
             problems.append(f"в отчёте есть лишнее «{needle}»")
+
+    needles = expect.get("tool_result_contains", [])
+    if needles:
+        # Проверяем данные, а не формулировку: то, что обязано быть, не должно зависеть от модели
+        blob = json.dumps(
+            [s.content for s in run.steps.filter(kind=Step.Kind.TOOL_RESULT)], ensure_ascii=False
+        ).lower()
+        for needle in needles:
+            if needle.lower() not in blob:
+                problems.append(f"в ответе инструмента нет «{needle}»")
 
     if expect.get("approval") and not run.steps.filter(kind=Step.Kind.APPROVAL).exists():
         problems.append("не запросил подтверждение человека")

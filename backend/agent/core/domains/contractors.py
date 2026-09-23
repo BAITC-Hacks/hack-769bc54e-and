@@ -58,10 +58,12 @@ Write the answer in Russian, in Markdown, in exactly this shape and nothing else
 1. One opening line: how many contractors were found and for which request.
 2. A numbered list, one item per returned card, in the order the catalog returned them.
    Each item: `**Имя** — one or two sentences of explanation.`
-3. If there are fewer than three cards, one closing line saying how many there are and why,
-   based on diagnose_request: which condition blocked whom, and then the ready-made wording
-   from `suggestions` — use it as it is, do not invent your own numbers or dates.
-   When `season_note` is present, add it: a thin month is the season, not a failure.
+3. If there are fewer than three cards, a closing block: one line saying how many there are
+   and which condition blocked whom, then **every** line of `suggestions`, each as its own
+   bullet, reproduced word for word. Not a summary of them, not a selection — all of them.
+   They already contain the right numbers, dates and city names; inventing your own is a defect.
+   When `season_note` is present, add it after the bullets: a thin month is the season,
+   not a failure.
 
 Rules for the explanations:
 - Build every sentence on the numbers and facts in `match`: budget headroom in percent,
