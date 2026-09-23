@@ -250,3 +250,20 @@ class ContractorDomainTests(TestCase):
     def test_diagnosis_says_where_the_category_exists(self):
         d = self.m.diagnose_request(self.ctx, **dict(self.base, city="Астана", category="Лайв-бэнд"))
         self.assertEqual(d["category_available_in"], ["Алматы"])
+
+    def test_quote_is_always_a_real_fragment_of_the_description(self):
+        for card in self.search(date="2026-10-15")["cards"]:  # A16
+            quote = card["match"]["quote"]
+            if quote is None:
+                continue
+            profile = next(p for p in self.m.catalog() if p["id"] == card["id"])
+            self.assertIn(quote.rstrip("."), profile["description"])
+
+    def test_words_echoed_from_the_request_are_not_counted_as_a_match(self):
+        card = self.search(date="2026-10-15", free_text="ведущий на свадьбу в Алматы")["cards"][0]
+        self.assertNotIn("ведущий", card["match"]["shared_words"])
+        self.assertNotIn("алматы", card["match"]["shared_words"])
+
+    def test_quote_selection_is_deterministic(self):
+        quotes = {tuple(c["match"]["quote"] or "" for c in self.search(date="2026-10-15")["cards"]) for _ in range(5)}
+        self.assertEqual(len(quotes), 1)

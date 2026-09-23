@@ -68,7 +68,9 @@ Rules for the explanations:
   the price, the accepted formats, the working languages, the hours, the words the request
   and the description share, and `match.quote` when it is present.
 - Quote `match.quote` verbatim when it is present: it is an exact fragment of the contractor's
-  own description. Never invent a quote and never paraphrase one.
+  own description. Never invent a quote and never paraphrase one. When a field is empty,
+  simply leave it out — never tell the reader that data is missing and never name internal
+  fields such as `match` or `quote` in the answer.
 - The cards must stay distinguishable with the names removed. Two explanations that would fit
   each other equally well are a defect.
 - Forbidden: "отличный выбор", "прекрасно подойдёт", "идеальный вариант", "профессионал своего
@@ -155,6 +157,54 @@ def _words(text: str) -> set[str]:
     return {w for w in cleaned.split() if len(w) > 3 and w not in _STOP}
 
 
+def _noise(req: dict) -> set[str]:
+    """Слова самих параметров запроса.
+
+    «Ведущий на свадьбу в Алматы» совпадёт с описанием любого ведущего из Алматы —
+    это не признак, а эхо запроса, и объяснение из него выходит пустым.
+    """
+    parts = [req.get(k) or "" for k in ("city", "category", "event_format", "language")]
+    return _words(" ".join(parts))
+
+
+QUOTE_MAX_CHARS = 180
+
+
+def _sentences(text: str) -> list[str]:
+    out, current = [], []
+    for chunk in text.replace("\n", " ").split(". "):
+        piece = chunk.strip()
+        if piece:
+            current.append(piece)
+    for piece in current:
+        out.append(piece if piece.endswith(".") else piece + ".")
+    return out
+
+
+def _quote(description: str, signal: set[str]) -> str | None:
+    """Точный фрагмент описания как доказательство под объяснением.
+
+    Выбирается детерминированно и возвращается дословно, поэтому модель физически
+    не может его придумать: ей остаётся только процитировать.
+    """
+    best, best_key = None, None
+    for index, sentence in enumerate(_sentences(description)):
+        if len(sentence) < 8:
+            continue
+        overlap = len(_words(sentence) & signal)
+        # Цифры в описании — это годы опыта и количество мероприятий, самая проверяемая конкретика
+        key = (overlap, any(c.isdigit() for c in sentence), -index)
+        if best_key is None or key > best_key:
+            best, best_key = sentence, key
+    if best is None:
+        return None
+    quote = best if best in description else best.rstrip(".")
+    if len(quote) > QUOTE_MAX_CHARS:
+        # Режем по границе слова: обрезок всё равно обязан быть дословным куском описания
+        quote = quote[:QUOTE_MAX_CHARS].rsplit(" ", 1)[0]
+    return quote if quote in description else None
+
+
 def _reasons(profile: dict, req: dict) -> list[dict]:
     """ВСЕ причины, по которым профиль не проходит. Пусто — проходит.
 
@@ -196,8 +246,10 @@ def _score(profile: dict, req: dict) -> tuple[float, dict]:
     else:
         budget_score = 0.5
 
-    overlap = _words(req.get("free_text") or "") & _words(profile["description"])
-    facts["description_keywords"] = sorted(overlap)[:5]
+    signal = _words(req.get("free_text") or "") - _noise(req)
+    overlap = signal & _words(profile["description"])
+    facts["shared_words"] = sorted(overlap)[:5]
+    facts["quote"] = _quote(profile["description"], signal)
     description_score = min(1.0, len(overlap) / 4)
 
     # Чем уже специализация, тем точнее попадание в конкретный формат
