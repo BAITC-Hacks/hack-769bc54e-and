@@ -243,3 +243,21 @@ details[open] summary { margin-bottom: 8px; }
 @media (prefers-reduced-motion: reduce) {
   .step-pending .step-kind { animation: none; }
 }
+
+/* ---------- Форма запроса ---------- */
+.request { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; margin-top: 8px; }
+.field { display: flex; flex-direction: column; min-width: 0; }
+.field-wide { grid-column: 1 / -1; }
+.request :is(input, select) {
+  width: 100%;
+  padding: 10px 12px;
+  font: 400 1rem var(--sans);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.request [aria-invalid="true"] { border-color: var(--threat); box-shadow: inset 0 0 0 1px var(--threat); }
+.request .error { margin-top: 8px; }
+:is(input, select):focus-visible { outline: 3px solid var(--gate); outline-offset: 2px; }
+@media (max-width: 480px) { .request { grid-template-columns: 1fr; } }

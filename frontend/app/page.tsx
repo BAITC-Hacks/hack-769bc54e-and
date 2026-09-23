@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Journal } from "@/components/Journal";
 import { api } from "@/lib/api";
-import { SUMMARY_LABELS, STATUS_TEXT, brand } from "@/lib/brand";
+import { FORM, SUMMARY_LABELS, STATUS_TEXT, brand } from "@/lib/brand";
+import {
+  CATEGORIES, CITIES, DATE_MAX, DATE_MIN, EMPTY_FORM, FORMATS, LANGUAGES,
+  REQUIRED_LABELS, fromText, hoursInvalid, missing, toTask, type RequestForm, type RequiredKey,
+} from "@/lib/request";
 import type { Health, Run, Sample } from "@/lib/types";
 
 /** Итог запуска цифрами. Это то, что называют в питче: «столько-то вместо столько-то». */
@@ -31,8 +35,9 @@ function Summary({ run }: { run: Run }) {
 }
 
 export default function Page() {
-  const [task, setTask] = useState("");
-  const [input, setInput] = useState("");
+  const [form, setForm] = useState<RequestForm>(EMPTY_FORM);
+  // Подсказку о пустых полях показываем только после попытки отправить, а не с порога
+  const [tried, setTried] = useState(false);
   const [samples, setSamples] = useState<Sample[]>([]);
   const [health, setHealth] = useState<Health | null>(null);
   const [run, setRun] = useState<Run | null>(null);
@@ -73,11 +78,20 @@ export default function Page() {
     return () => clearInterval(timer);
   }, [run?.id, active]);
 
-  async function start() {
+  const set = (key: keyof RequestForm) => (e: { target: { value: string } }) =>
+    setForm((f) => ({ ...f, [key]: e.target.value }));
+  const gaps = missing(form);
+  const badHours = hoursInvalid(form);
+  const invalid = (key: RequiredKey) => tried && gaps.includes(key);
+
+  async function start(e: FormEvent) {
+    e.preventDefault();
+    setTried(true);
+    if (gaps.length || badHours) return;
     setError("");
     setBusy(true);
     try {
-      setRun(await api.startRun(task, input));
+      setRun(await api.startRun(toTask(form), ""));
       setCollapsed(true);
     } catch (e) {
       setError((e as Error).message);
@@ -117,9 +131,10 @@ export default function Page() {
               <button
                 key={s.id}
                 className="chip"
+                type="button"
                 onClick={() => {
-                  setTask(s.task);
-                  setInput(s.input);
+                  setForm(fromText(s.task));
+                  setTried(false);
                 }}
               >
                 {s.label}
@@ -128,21 +143,77 @@ export default function Page() {
           </div>
         </div>
 
-        <label htmlFor="task">{brand.taskLabel}</label>
-        <textarea
-          id="task"
-          rows={3}
-          value={task}
-          onChange={(e) => setTask(e.target.value)}
-          placeholder={brand.taskPlaceholder}
-        />
+        <form className="request" onSubmit={start} noValidate>
+          <div className="field">
+            <label htmlFor="category">{FORM.category}</label>
+            <select id="category" value={form.category} onChange={set("category")} aria-invalid={invalid("category")}>
+              <option value="">{FORM.categoryAny}</option>
+              {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="city">{FORM.city}</label>
+            <select id="city" value={form.city} onChange={set("city")} aria-invalid={invalid("city")}>
+              <option value="">{FORM.cityAny}</option>
+              {CITIES.map((c) => <option key={c}>{c}</option>)}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="date">{FORM.date}</label>
+            <input id="date" type="date" min={DATE_MIN} max={DATE_MAX} value={form.date} onChange={set("date")} aria-invalid={invalid("date")} />
+          </div>
+          <div className="field">
+            <label htmlFor="format">{FORM.format}</label>
+            <select id="format" value={form.format} onChange={set("format")} aria-invalid={invalid("format")}>
+              <option value="">{FORM.formatAny}</option>
+              {FORMATS.map((f) => <option key={f}>{f}</option>)}
+            </select>
+          </div>
+          <div className="field field-wide">
+            <label htmlFor="budget">{FORM.budget}</label>
+            <input
+              id="budget"
+              inputMode="numeric"
+              placeholder={FORM.budgetPlaceholder}
+              value={form.budget ? Number(form.budget).toLocaleString("ru-RU") : ""}
+              onChange={(e) => setForm((f) => ({ ...f, budget: e.target.value.replace(/\D/g, "").slice(0, 9) }))}
+              aria-invalid={invalid("budget")}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="hours">{FORM.hours}</label>
+            <input id="hours" type="number" min={1} max={24} placeholder={FORM.hoursPlaceholder} value={form.hours} onChange={set("hours")} aria-invalid={badHours} />
+          </div>
+          <div className="field">
+            <label htmlFor="language">{FORM.language}</label>
+            <select id="language" value={form.language} onChange={set("language")}>
+              <option value="">{FORM.languageAny}</option>
+              {LANGUAGES.map((l) => <option key={l}>{l}</option>)}
+            </select>
+          </div>
+          <div className="field field-wide">
+            <label htmlFor="wishes">{FORM.wishes}</label>
+            <textarea
+              id="wishes"
+              rows={2}
+              value={form.wishes}
+              onChange={set("wishes")}
+              placeholder={FORM.wishesPlaceholder}
+            />
+          </div>
 
-        <label htmlFor="input">{brand.inputLabel}</label>
-        <textarea id="input" className="mono" rows={16} value={input} onChange={(e) => setInput(e.target.value)} spellCheck={false} />
+          {tried && (gaps.length > 0 || badHours) && (
+            <p className="error field-wide" role="alert">
+              {gaps.length > 0 && `${FORM.fillIn} ${gaps.map((k) => REQUIRED_LABELS[k]).join(", ")}.`}
+              {gaps.length > 0 && badHours && " "}
+              {badHours && FORM.badHours}
+            </p>
+          )}
 
-        <button className="btn btn-primary" onClick={start} disabled={busy || !task.trim() || !!active}>
-          {busy ? brand.startingButton : brand.startButton}
-        </button>
+          <button type="submit" className="btn btn-primary field-wide" disabled={busy || !!active}>
+            {busy ? brand.startingButton : brand.startButton}
+          </button>
+        </form>
 
         {error && <p className="error" role="alert">{error}</p>}
         {health && (
