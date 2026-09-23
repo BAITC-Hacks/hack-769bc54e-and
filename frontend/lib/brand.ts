@@ -66,13 +66,38 @@ export function buildRequestText(request: ContractorRequestText): string {
   return `${parts.join(", ")}.${wishes ? ` Хочу: ${wishes}` : ""}`;
 }
 
+const MONTHS_GENITIVE = [
+  "января", "февраля", "марта", "апреля", "мая", "июня",
+  "июля", "августа", "сентября", "октября", "ноября", "декабря",
+];
+
+/** «2026-10-15» → «15 октября 2026». Что не разобралось — возвращается как есть. */
+export function humanDate(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!m) return iso;
+  return `${Number(m[3])} ${MONTHS_GENITIVE[Number(m[2]) - 1] ?? m[2]} ${m[1]}`;
+}
+
+/**
+ * Запрос для человека — вместо текста, который уходит модели. Тот читается как лог;
+ * этот стоит над результатом и должен читаться как заголовок.
+ */
+export function requestSummary(request: ContractorRequestText): string {
+  const parts = [request.category, request.city, humanDate(request.date), request.eventFormat];
+  if (Number(request.budget) > 0) parts.push(`до ${Number(request.budget).toLocaleString("ru-RU")} ₸`);
+  if (request.duration) parts.push(`${Number(request.duration)} ч`);
+  if (request.language) parts.push(request.language);
+  return parts.join(" · ");
+}
+
 /** Подписи блока с карточками подбора. */
 export const RESULTS = {
   title: "Результат подбора",
   priceUnknown: "цена не указана",
   pricePrefix: "от",
   writing: "Модель пишет объяснение…",
-  factsNote: "Без модели: собрано из фактов каталога",
+  factsNote: "Собрано из фактов каталога без модели",
+  knownValues: "В каталоге есть:",
   quoteLabel: "Из описания подрядчика",
   modelText: "Текст ответа модели",
   searching: "Разбираю запрос и ищу по каталогу…",
@@ -163,7 +188,7 @@ export const DATE_COMPARISON = {
   sameDate: "Выберите дату, отличную от первой",
   waiting: "Подбираем подрядчиков на вторую дату…",
   failed: "Не удалось получить выдачу на вторую дату.",
-  firstTitle: (date: string) => `Выдача на ${date}`,
-  secondTitle: (date: string) => `Выдача на ${date}`,
+  firstTitle: (date: string) => `Выдача на ${humanDate(date)}`,
+  secondTitle: (date: string) => `Выдача на ${humanDate(date)}`,
   onlyOnThisDate: "Только на этой дате",
 } as const;

@@ -86,8 +86,10 @@ export const quoteText = (quote: string) => (/[.!?…»]$/.test(quote) ? quote :
  * без ключей видит настоящий отбор, и карточка без объяснения выглядела бы сломанной.
  */
 export function factsLine(card: ContractorCard): string {
-  const { budget, format, languages, duration } = card.match;
+  const { budget, format, languages, duration, lead } = card.match;
   const out: string[] = [];
+  // Сначала то, чем эта карточка отличается от соседей: без этого три текста читаются одинаково
+  if (lead) out.push(`${capitalize(lead)}.`);
   if (budget) {
     const { price_from_kzt: price, budget_kzt: ceiling, headroom_percent: headroom } = budget;
     out.push(

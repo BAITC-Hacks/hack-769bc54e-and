@@ -68,6 +68,8 @@ export interface RejectedContractor {
 
 /** Диагностика приходит вместе с поиском, когда карточек меньше трёх. */
 export interface Diagnosis {
+  /** Одна строка: кто кого отсеял. Собрана кодом, перечисляет только сработавшие причины */
+  headline?: string;
   /** Готовые формулировки «что изменить» — показываются дословно */
   suggestions: string[];
   /** Бедный месяц — это сезон, а не сбой; null, если месяц не выделяется */
@@ -79,8 +81,12 @@ export interface CardMatch {
   /** Нет, если у профиля не указана цена */
   budget?: { price_from_kzt: number; budget_kzt: number; headroom_percent: number };
   shared_words: string[];
-  /** Точный фрагмент описания; null, если общих слов с запросом нет */
+  /** Точный фрагмент описания; null, если подходящей фразы не нашлось */
   quote: string | null;
+  /** Факт, которого нет у соседей по выдаче; null у единственной карточки */
+  lead: string | null;
+  /** Остальные уникальные признаки, без повтора lead */
+  standouts: string[];
   format: { requested: string | null; accepts: string[] };
   languages: string[];
   duration: { max_hours: number | null; requested: number | null; not_time_bound: boolean };
@@ -100,6 +106,12 @@ export interface ContractorCard {
 
 export interface SearchResult {
   outcome: SearchOutcome;
+  /** «в категории … всего N, на <дату> заняты M» — разница между датами видна и при трёх карточках */
+  availability_note?: string;
+  /** Готовая первая строка ответа, собрана кодом */
+  opening?: string;
+  /** При unknown_city / unknown_category — допустимые значения */
+  known_values?: string[];
   /** Нет при unknown_city и unknown_category */
   in_city_and_category?: number;
   /** Нет при outcome = no_category_in_city */

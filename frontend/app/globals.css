@@ -110,6 +110,7 @@ textarea.mono { font: 400 0.8125rem/1.6 var(--mono); white-space: pre; overflow-
 }
 .status strong { font-size: 1.25rem; }
 .status .tokens { margin-left: auto; font-variant-numeric: tabular-nums; opacity: 0.7; }
+.status-wishes { flex-basis: 100%; color: var(--muted); font-size: 0.9375rem; }
 .status span { color: var(--muted); }
 .status-awaiting_approval strong { color: #9a6408; }
 .status-done strong { color: var(--clear); }
@@ -291,6 +292,8 @@ details[open] summary { margin-bottom: 8px; }
 .outcome-title { margin-top: 6px; font-size: 1.1875rem; font-weight: 700; }
 .outcome-sub { margin-top: 2px; color: var(--muted); font-size: 0.9375rem; font-variant-numeric: tabular-nums; }
 .outcome-warning { margin-top: 8px; font-size: 0.9375rem; font-weight: 500; color: #9a6408; }
+/* Занятость категории на дату: то, что отличает две даты даже при одинаковых карточках */
+.outcome-availability { margin-top: 6px; font-size: 0.9375rem; font-variant-numeric: tabular-nums; }
 
 /* Почему и что изменить: из данных инструмента дословно */
 .diagnosis {
@@ -302,6 +305,7 @@ details[open] summary { margin-bottom: 8px; }
   border-radius: 8px;
 }
 .diagnosis h3 { font-size: 0.8125rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 6px; }
+.diagnosis-headline { margin: 0 0 8px; font-size: 0.9375rem; font-variant-numeric: tabular-nums; }
 .diagnosis ul { margin: 0; padding-left: 18px; }
 .diagnosis li + li { margin-top: 4px; }
 .reasons { list-style: none; padding-left: 0 !important; }

@@ -4,7 +4,9 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Journal } from "@/components/Journal";
 import { Results } from "@/components/Results";
 import { api } from "@/lib/api";
-import { DATE_COMPARISON, MISSING_LABELS, SUMMARY_LABELS, STATUS_TEXT, brand, buildRequestText } from "@/lib/brand";
+import {
+  DATE_COMPARISON, MISSING_LABELS, SUMMARY_LABELS, STATUS_TEXT, brand, buildRequestText, requestSummary,
+} from "@/lib/brand";
 import { differingContractorIds, findSearchResult } from "@/lib/results";
 import type { ContractorOptions, Health, Run } from "@/lib/types";
 
@@ -292,8 +294,8 @@ export default function Page() {
         {health && (
           <p className="meta">
             {health.mock
-              ? `Mock-режим: модель выключена, шаги заскриптованы. Домен: ${health.domain}. Задайте OPENAI_API_KEY и OPENAI_MODEL в .env.`
-              : `Модель: ${health.model}. Домен: ${health.domain}`}
+              ? "Без ключа модели: отбор, порядок и диагностика настоящие, объяснения собраны из фактов каталога. Для текстов от LLM задайте OPENAI_API_KEY и OPENAI_MODEL в .env."
+              : `Модель: ${health.model}`}
           </p>
         )}
       </section>
@@ -309,7 +311,10 @@ export default function Page() {
             </div>
             <div className={`status status-${run.status}`}>
               <strong>{STATUS_TEXT[run.status]}</strong>
-              <span>{run.task}</span>
+              <span>{primaryRequest ? requestSummary(primaryRequest) : run.task}</span>
+              {primaryRequest?.wishes.trim() && (
+                <span className="status-wishes">Пожелания: {primaryRequest.wishes.trim()}</span>
+              )}
               {run.tokens.prompt + run.tokens.completion > 0 && (
                 <span className="tokens">
                   {run.tokens.prompt + run.tokens.completion} токенов

@@ -92,6 +92,13 @@ function Outcome({ found }: { found: SearchResult }) {
       <span className="outcome-badge">{OUTCOME[kind].badge}</span>
       <p className="outcome-title">{title}</p>
       {sub && <p className="outcome-sub">{sub}</p>}
+      {found.availability_note && <p className="outcome-availability">{capitalize(found.availability_note)}</p>}
+      {kind === "absent" && found.known_values && found.known_values.length > 0 && (
+        <p className="outcome-sub">
+          {RESULTS.knownValues} {found.known_values.slice(0, 8).join(", ")}
+          {found.known_values.length > 8 ? ` и ещё ${found.known_values.length - 8}` : ""}
+        </p>
+      )}
       {found.warning && <p className="outcome-warning">{capitalize(found.warning)}</p>}
     </div>
   );
@@ -105,6 +112,7 @@ function Diagnosis({ found }: { found: SearchResult }) {
   const reasons = reasonCounts(found);
   const tips = found.diagnosis?.suggestions ?? [];
   const season = found.diagnosis?.season_note;
+  const headline = found.diagnosis?.headline;
   if (!reasons.length && !tips.length && !season) return null;
 
   return (
@@ -112,6 +120,7 @@ function Diagnosis({ found }: { found: SearchResult }) {
       {reasons.length > 0 && (
         <section>
           <h3>{RESULTS.whyTitle}</h3>
+          {headline && <p className="diagnosis-headline">{capitalize(headline)}</p>}
           <ul className="reasons">
             {reasons.map(([code, count]) => (
               <li key={code}>
@@ -174,7 +183,7 @@ function responseSeconds(run: Run): number | null {
 /**
  * Итог подбора: исход, карточки из search_contractors в его порядке, объяснения — из ответа
  * модели, диагностика — из инструмента. Пустого экрана нет ни в одном состоянии запуска.
- * В mock-режиме ответ модели — сырой JSON, поэтому его не разбираем.
+ * Без ключа бэкенд собирает ответ того же формата из фактов, поэтому разбор общий.
  */
 export function Results({
   run,
@@ -223,7 +232,7 @@ export function Results({
     );
   }
 
-  const texts = explanations(found.cards, mock || !run.final_report ? [] : parseItems(run.final_report));
+  const texts = explanations(found.cards, run.final_report ? parseItems(run.final_report) : []);
   const writing = run.status === "running";
   const elapsed = responseSeconds(run);
 
