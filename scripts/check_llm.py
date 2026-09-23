@@ -42,8 +42,7 @@ def main() -> int:
     django.setup()
     from django.conf import settings
 
-    base = settings.OPENAI_BASE_URL or "https://api.openai.com/v1 (по умолчанию)"
-    print(f"endpoint   {base}")
+    print(f"endpoint   {settings.OPENAI_BASE_URL}")
     print(f"модель     {settings.OPENAI_MODEL or '(не задана!)'}")
     print(f"ключ       {'задан, ' + settings.OPENAI_API_KEY[:7] + '…' if settings.OPENAI_API_KEY else 'НЕ ЗАДАН'}")
 
@@ -57,7 +56,7 @@ def main() -> int:
 
     client = OpenAI(
         api_key=settings.OPENAI_API_KEY,
-        base_url=settings.OPENAI_BASE_URL or None,
+        base_url=settings.OPENAI_BASE_URL,
         timeout=30,
         max_retries=1,
     )

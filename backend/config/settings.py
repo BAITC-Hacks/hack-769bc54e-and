@@ -44,9 +44,9 @@ TIME_ZONE = "Asia/Almaty"
 # Предметная область = модуль в agent/core/domains/. Смена трека = смена этого значения.
 AGENT_DOMAIN = os.getenv("AGENT_DOMAIN", "example")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-# Пусто -> api.openai.com. Любой OpenAI-совместимый провайдер подключается сменой этой строки
-# (например, NVIDIA NIM: https://integrate.api.nvidia.com/v1).
-OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "")
+# Адрес задаём всегда явно. Пустую переменную окружения SDK принимает за адрес
+# и падает с UnsupportedProtocol, поэтому пустое значение заменяем значением по умолчанию.
+OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "").strip() or "https://api.openai.com/v1"
 # Значения по умолчанию нет: модель обязана быть задана явно и проверена
 # командой `python scripts/dev.py llm`.
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "")

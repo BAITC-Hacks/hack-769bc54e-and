@@ -26,7 +26,7 @@ def _openai_chat(messages, tool_schemas):
 
         _client = OpenAI(
             api_key=settings.OPENAI_API_KEY,
-            base_url=settings.OPENAI_BASE_URL or None,
+            base_url=settings.OPENAI_BASE_URL,
             timeout=60,
             max_retries=2,
         )
