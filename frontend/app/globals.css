@@ -259,6 +259,8 @@ details[open] summary { margin-bottom: 8px; }
 .results { max-width: 78ch; margin-bottom: 36px; }
 .results-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .results h2 { font-size: 1.375rem; letter-spacing: -0.01em; }
+.results-actions { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: flex-end; gap: 6px 14px; }
+.response-time { color: var(--muted); font-size: 0.875rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* Исход подбора. Цвет, метка и заголовок различают четыре вида ответа до чтения карточек (R12). */
 .outcome {

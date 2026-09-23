@@ -163,6 +163,14 @@ function Rejected({ found, hideIdentity }: { found: SearchResult; hideIdentity: 
   );
 }
 
+function responseSeconds(run: Run): number | null {
+  if (run.status !== "done") return null;
+  const last = run.steps[run.steps.length - 1];
+  if (!last) return null;
+  const elapsed = (new Date(last.at).getTime() - new Date(run.created_at).getTime()) / 1000;
+  return Number.isFinite(elapsed) && elapsed >= 0 ? elapsed : null;
+}
+
 /**
  * Итог подбора: исход, карточки из search_contractors в его порядке, объяснения — из ответа
  * модели, диагностика — из инструмента. Пустого экрана нет ни в одном состоянии запуска.
@@ -217,16 +225,20 @@ export function Results({
 
   const texts = explanations(found.cards, mock || !run.final_report ? [] : parseItems(run.final_report));
   const writing = run.status === "running";
+  const elapsed = responseSeconds(run);
 
   return (
     <section className="results" aria-labelledby={titleId}>
       <div className="results-head">
         <h2 id={titleId}>{title}</h2>
-        {showIdentityToggle && found.cards.length > 0 && (
-          <button className="btn-link" type="button" aria-pressed={identitiesHidden} onClick={onToggleIdentities}>
-            {identitiesHidden ? RESULTS.showIdentities : RESULTS.hideIdentities}
-          </button>
-        )}
+        <div className="results-actions">
+          {elapsed !== null && <span className="response-time">{RESULTS.responseTime(elapsed)}</span>}
+          {showIdentityToggle && found.cards.length > 0 && (
+            <button className="btn-link" type="button" aria-pressed={identitiesHidden} onClick={onToggleIdentities}>
+              {identitiesHidden ? RESULTS.showIdentities : RESULTS.hideIdentities}
+            </button>
+          )}
+        </div>
       </div>
       <Outcome found={found} />
       {found.cards.length > 0 && (
