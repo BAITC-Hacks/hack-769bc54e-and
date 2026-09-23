@@ -7,7 +7,8 @@
 
 Инструменты:
   search_contractors  — жёсткие фильтры + скоринг, до 3 карточек с фактами совпадения;
-  diagnose_request    — что изменить в запросе, если подходящих меньше трёх.
+                        при выдаче меньше трёх сам прикладывает диагностику;
+  diagnose_request    — та же диагностика для гипотетического запроса.
 
 Модель получает не профили, а посчитанные факты, поэтому объяснения не могут выйти
 взаимозаменяемыми: в них числа и признаки конкретного подрядчика.
@@ -156,6 +157,61 @@ def catalog() -> tuple[dict, ...]:
                 }
             )
     return tuple(rows)
+
+
+def _stems(value: str) -> list[str]:
+    """Основы слов: «свадьбу» и «свадьба» должны совпадать без морфологии."""
+    return [w[:5] for w in re.findall(r"[^\W\d_]+", value.lower()) if len(w) > 2]
+
+
+def _match_by_stems(text: str, options) -> str | None:
+    """Самый длинный вариант, все основы которого встречаются в тексте.
+
+    Длинные проверяются первыми, иначе «Ведущий» перехватит «Ведущего церемонии».
+    """
+    low = text.lower()
+    for option in sorted(options, key=lambda o: (-len(_stems(o)), -len(o))):
+        if all(stem in low for stem in _stems(option)):
+            return option
+    return None
+
+
+@lru_cache(maxsize=1)
+def vocabulary() -> dict:
+    """Допустимые значения полей, выведенные из каталога.
+
+    Один источник правды: из него собираются enum в схеме инструмента, проверка
+    входа и словари для формы интерфейса.
+    """
+    cities, categories, formats, languages = set(), set(), set(), set()
+    for profile in catalog():
+        cities.add(profile["city"])
+        categories.update(profile["categories"])
+        formats.update(profile["event_formats"])
+        languages.update(profile["languages"])
+    return {
+        "cities": sorted(cities),
+        "categories": sorted(categories),
+        "event_formats": sorted(formats),
+        "languages": sorted(languages),
+    }
+
+
+def _normalize(value: str | None, options: list[str]) -> str | None:
+    """Приводит значение к каноническому виду каталога.
+
+    Модель иногда присылает «Ведущие» вместо «Ведущий». Молча искать такую категорию
+    нельзя: поиск вернёт ноль и скажет «в Алматы нет ведущих», что неправда.
+    """
+    if not value:
+        return None
+    value = value.strip()
+    if value in options:
+        return value
+    lowered = {o.lower(): o for o in options}
+    if value.lower() in lowered:
+        return lowered[value.lower()]
+    return _match_by_stems(value, options)
 
 
 def _parse_date(value: str) -> dt.date:
@@ -338,35 +394,66 @@ def _shortlist(req: dict) -> tuple[list[dict], list[dict], list[dict]]:
 # --------------------------------------------------------------------------
 
 def _request(city, category, date, event_format, budget_kzt, duration_hours, language, free_text) -> dict:
-    return {
-        "city": city.strip(),
-        "category": category.strip(),
-        "date": date.strip(),
-        "event_format": event_format.strip(),
+    vocab = vocabulary()
+    resolved_city = _normalize(city, vocab["cities"])
+    resolved_category = _normalize(category, vocab["categories"])
+    req = {
+        "city": resolved_city or (city or "").strip(),
+        "category": resolved_category or (category or "").strip(),
+        "date": (date or "").strip(),
+        "event_format": _normalize(event_format, vocab["event_formats"]) or (event_format or "").strip(),
         "budget_kzt": int(budget_kzt),
         "duration_hours": duration_hours,
-        "language": (language or "").strip() or None,
+        "language": _normalize(language, vocab["languages"]),
         "free_text": free_text or "",
+    }
+    # Что не удалось привести к каталогу — фиксируем явно, чтобы не выдать
+    # «в этом городе такой категории нет» за ответ на несуществующее значение.
+    unknown = {}
+    if not resolved_city:
+        unknown["city"] = (city or "").strip()
+    if not resolved_category:
+        unknown["category"] = (category or "").strip()
+    if unknown:
+        req["_unknown"] = unknown
+    return req
+
+
+def _search_schema() -> dict:
+    """Схема с enum из каталога: так модель физически не может прислать «Ведущие»."""
+    vocab = vocabulary()
+    return {
+        "type": "object",
+        "properties": {
+            "city": {"type": "string", "enum": vocab["cities"], "description": "City from the catalog"},
+            "category": {
+                "type": "string",
+                "enum": vocab["categories"],
+                "description": "Contractor category exactly as in the catalog",
+            },
+            "date": {"type": "string", "description": "Event date, YYYY-MM-DD"},
+            "event_format": {
+                "type": "string",
+                "enum": vocab["event_formats"],
+                "description": "Event format from the catalog",
+            },
+            "budget_kzt": {"type": "integer", "description": "Budget ceiling per contractor, KZT"},
+            "duration_hours": {"type": "integer", "description": "Optional. Hours on site"},
+            "language": {
+                "type": "string",
+                "enum": vocab["languages"],
+                "description": "Optional. Working language the client insists on",
+            },
+            "free_text": {
+                "type": "string",
+                "description": "Optional. The client's wishes verbatim, used for description relevance",
+            },
+        },
+        "required": ["city", "category", "date", "event_format", "budget_kzt"],
     }
 
 
-_SEARCH_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "city": {"type": "string", "description": "Алматы, Астана or Зарубежье"},
-        "category": {"type": "string", "description": "Contractor category exactly as in the catalog, e.g. Ведущий"},
-        "date": {"type": "string", "description": "Event date, YYYY-MM-DD"},
-        "event_format": {
-            "type": "string",
-            "description": "One of: свадьба, той, корпоратив, конференция, юбилей, день рождения",
-        },
-        "budget_kzt": {"type": "integer", "description": "Budget ceiling per contractor, KZT"},
-        "duration_hours": {"type": "integer", "description": "Optional. Hours on site"},
-        "language": {"type": "string", "description": "Optional: русский, казахский or английский"},
-        "free_text": {"type": "string", "description": "Optional. The client's request verbatim, used for description relevance"},
-    },
-    "required": ["city", "category", "date", "event_format", "budget_kzt"],
-}
+_SEARCH_SCHEMA = _search_schema()
 
 
 @tool(
@@ -394,6 +481,24 @@ def search_contractors(
         requested = _parse_date(req["date"])
     except ValueError:
         return {"error": f"дата «{req['date']}» не в формате ГГГГ-ММ-ДД"}
+
+    unknown = req.pop("_unknown", None)
+    if unknown:
+        field, value = next(iter(unknown.items()))
+        known = vocabulary()["cities" if field == "city" else "categories"]
+        return {
+            "outcome": f"unknown_{field}",
+            "request": req,
+            "cards": [],
+            "note": f"значения «{value}» нет в каталоге",
+            "known_values": known,
+            "diagnosis": {
+                "suggestions": [
+                    f"«{value}» — не {'город' if field == 'city' else 'категория'} из каталога",
+                    "допустимые значения: " + ", ".join(known),
+                ]
+            },
+        }
 
     out_of_window = not (WINDOW_START <= requested <= WINDOW_END)
     pool, passed, rejected = _shortlist(req)
@@ -606,6 +711,10 @@ def diagnose_request(
     free_text: str | None = None,
 ):
     req = _request(city, category, date, event_format, budget_kzt, duration_hours, language, free_text)
+    unknown = req.pop("_unknown", None)
+    if unknown:
+        field, value = next(iter(unknown.items()))
+        return {"outcome": f"unknown_{field}", "note": f"значения «{value}» нет в каталоге"}
     try:
         requested = _parse_date(req["date"])
     except ValueError:
@@ -672,23 +781,6 @@ def _season(req: dict) -> dict:
 _CITIES = ("Алматы", "Астана", "Зарубежье")
 _FORMATS = ("свадьба", "той", "корпоратив", "конференция", "юбилей", "день рождения")
 _LANGUAGES = ("русский", "казахский", "английский")
-
-
-def _stems(value: str) -> list[str]:
-    """Основы слов: «свадьбу» и «свадьба» должны совпадать без морфологии."""
-    return [w[:5] for w in re.findall(r"[^\W\d_]+", value.lower()) if len(w) > 2]
-
-
-def _match_by_stems(text: str, options) -> str | None:
-    """Самый длинный вариант, все основы которого встречаются в тексте.
-
-    Длинные проверяются первыми, иначе «Ведущий» перехватит «Ведущего церемонии».
-    """
-    low = text.lower()
-    for option in sorted(options, key=lambda o: (-len(_stems(o)), -len(o))):
-        if all(stem in low for stem in _stems(option)):
-            return option
-    return None
 
 
 def _guess(request: str) -> dict | None:

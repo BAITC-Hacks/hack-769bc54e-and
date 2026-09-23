@@ -280,10 +280,28 @@ class ContractorDomainTests(TestCase):
         d = self.m.diagnose_request(self.ctx, **dict(self.base, city="Астана", category="Лайв-бэнд"))
         self.assertTrue(any("Алматы" in line for line in d["suggestions"]))
 
-    def test_category_absent_everywhere_still_gets_a_suggestion(self):
-        d = self.m.diagnose_request(self.ctx, **dict(self.base, category="Дрессировщик тигров"))
+    def test_unknown_category_is_not_passed_off_as_absent_in_the_city(self):
+        # Раньше «Дрессировщик тигров» давал «в Алматы нет такой категории» — ложь,
+        # выглядящая как ответ. Теперь несуществующее значение названо своим именем.
+        r = self.search(category="Дрессировщик тигров")
+        self.assertEqual(r["outcome"], "unknown_category")
+        self.assertIn("Ведущий", r["known_values"])
+
+    def test_unknown_city_is_reported_as_such(self):
+        r = self.search(city="Алма-Ата")
+        self.assertEqual(r["outcome"], "unknown_city")
+        self.assertIn("Алматы", r["known_values"])
+
+    def test_declined_and_lowercase_values_are_normalised(self):
+        for category in ("Ведущие", "ведущий", " Ведущий "):
+            r = self.search(category=category, date="2026-10-15")
+            self.assertEqual(r["outcome"], "matched", category)
+            self.assertEqual(r["request"]["category"], "Ведущий")
+
+    def test_real_category_missing_only_here_still_says_where_it_exists(self):
+        d = self.m.diagnose_request(self.ctx, **dict(self.base, city="Астана", category="Декоратор"))
         self.assertEqual(d["outcome"], "no_category_in_city")
-        self.assertTrue(any("в других городах" in line for line in d["suggestions"]))
+        self.assertTrue(any("Алматы" in line for line in d["suggestions"]))
 
     def test_suggestions_are_phrased_as_counts_that_would_fit(self):
         d = self.m.diagnose_request(self.ctx, **dict(self.base, date="2026-10-15", budget_kzt=400000))
