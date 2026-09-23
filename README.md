@@ -293,6 +293,7 @@ python scripts/dev.py eval      # прогон кейсов, отчёт в docs/
 
 ## Внутренние документы
 
+`TASKS.md` — доска задач команды · `CLAUDE.md` — разбор Задачи ·
 `AGENTS.md` — правила разработки · `docs/POLOZHENIE.md` — Положение хакатона ·
 `docs/HOURLY.md` — почасовой журнал работы · `docs/EVAL.md` — результаты прогона · `docs/TEAM_WORKFLOW.md` — как работаем втроём ·
 `docs/DEMO_CHECKLIST.md` — сценарий демонстрации · `docs/PITCH.md` — заготовка питча.
