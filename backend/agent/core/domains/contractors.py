@@ -57,11 +57,15 @@ How to work here:
 REPORT_FORMAT = """\
 Write the answer in Russian, in Markdown, in exactly this shape and nothing else:
 
-1. One opening line: how many contractors were found and for which request.
+1. One opening line: how many contractors were found and for which request, ending with
+   `availability_note` as it is — the reader must see how many of the category are booked
+   on that exact date, otherwise two different dates look the same.
 2. A numbered list, one item per returned card, in the order the catalog returned them.
    Each item: `**Имя** — one or two sentences of explanation.`
-3. If there are fewer than three cards, a closing block: one line saying how many there are
-   and which condition blocked whom, then **every** line of `diagnosis.suggestions`, each as its own
+3. If there are fewer than three cards, a closing block: first `diagnosis.headline`
+   reproduced as it is — it already lists exactly which conditions blocked how many, and
+   listing conditions that did not occur is a defect — then **every** line of
+   `diagnosis.suggestions`, each as its own
    bullet, reproduced word for word. Not a summary of them, not a selection — all of them.
    They already contain the right numbers, dates and city names; inventing your own is a defect.
    When `diagnosis.season_note` is present, add it after the bullets: a thin month is the season,
@@ -69,14 +73,23 @@ Write the answer in Russian, in Markdown, in exactly this shape and nothing else
 
 Rules for the explanations:
 - Build every sentence on the numbers and facts in `match`: budget headroom in percent,
-  the price, the accepted formats, the working languages, the hours, the words the request
-  and the description share, and `match.quote` when it is present.
+  the price, the accepted formats, the working languages, the hours, and `match.quote`.
+- `match.shared_words` lists the words the client's wishes and the description really share.
+  When it is empty, the description matched nothing and you must not claim otherwise —
+  saying "the description mentions weddings" when that word is not in `shared_words`
+  is a fabrication, even if it sounds plausible. Say nothing about the description instead,
+  or quote `match.quote`, which is always a literal fragment.
 - Quote `match.quote` verbatim when it is present: it is an exact fragment of the contractor's
   own description. Never invent a quote and never paraphrase one. When a field is empty,
   simply leave it out — never tell the reader that data is missing and never name internal
   fields such as `match` or `quote` in the answer.
 - The cards must stay distinguishable with the names removed. Two explanations that would fit
   each other equally well are a defect.
+- `match.standouts` says what sets this contractor apart from the others that passed —
+  cheapest of the three, the only one with English, the narrowest specialisation.
+  **When it is not empty, the explanation must OPEN with one of these facts**, before any
+  price or format. It is the answer to "why this one and not the next", and without it three
+  cards read as one template with different numbers.
 - Forbidden: "отличный выбор", "прекрасно подойдёт", "идеальный вариант", "профессионал своего
   дела", "качественно и в срок", "не пожалеете" and any other praise that is not a fact from
   `match`. No adjectives that the data does not support.
@@ -234,6 +247,19 @@ def _words(text: str) -> set[str]:
     return {w for w in cleaned.split() if len(w) > 3 and w not in _STOP}
 
 
+def _stemmed(text: str) -> dict[str, str]:
+    """Основа -> первое встреченное слово с этой основой.
+
+    Русский склоняется: «интерактив» в пожелании и «интерактивом» в описании — одно и то же.
+    Точное совпадение слов такие пары теряет, а с ними теряется вся «близость по смыслу»
+    из требования 2.
+    """
+    out: dict[str, str] = {}
+    for word in _words(text):
+        out.setdefault(word[:5], word)
+    return out
+
+
 def _noise(req: dict) -> set[str]:
     """Слова самих параметров запроса.
 
@@ -247,14 +273,32 @@ def _noise(req: dict) -> set[str]:
 QUOTE_MAX_CHARS = 180
 
 
+_SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+|[\n•·—]+")
+# Фразы, которые формально «предложения», но доказательством не являются
+# Приветствия и контактная обвязка — формально предложения, доказательством не являются
+_WEAK_QUOTE = re.compile(
+    r"^(меня зовут|приветству|здравствуй|добрый день|привет)"
+    r"|связ\w*\s+со\s+мной|телефон|whatsapp|инстаграм|instagram|заключаем договор"
+    r"|подробную информацию|пишите|звоните",
+    re.I,
+)
+
+
 def _sentences(text: str) -> list[str]:
-    out, current = [], []
-    for chunk in text.replace("\n", " ").split(". "):
-        piece = chunk.strip()
-        if piece:
-            current.append(piece)
-    for piece in current:
-        out.append(piece if piece.endswith(".") else piece + ".")
+    """Куски описания, пригодные на роль цитаты.
+
+    Разбиение только по «. » оставляло «Что вас ждёт: • Разработанный» и обрывки
+    с КАПСом — такая «цитата» подрывает доверие вместо того, чтобы его создавать.
+    """
+    out = []
+    for piece in _SENTENCE_SPLIT.split(text):
+        piece = piece.strip(" \t-–—•·")
+        if len(piece) < 20 or _WEAK_QUOTE.match(piece):
+            continue
+        letters = [c for c in piece if c.isalpha()]
+        if letters and sum(c.isupper() for c in letters) / len(letters) > 0.3:
+            continue  # обрывок с КАПСом
+        out.append(piece)
     return out
 
 
@@ -266,11 +310,15 @@ def _quote(description: str, signal: set[str]) -> str | None:
     """
     best, best_key = None, None
     for index, sentence in enumerate(_sentences(description)):
-        if len(sentence) < 8:
-            continue
-        overlap = len(_words(sentence) & signal)
-        # Цифры в описании — это годы опыта и количество мероприятий, самая проверяемая конкретика
-        key = (overlap, any(c.isdigit() for c in sentence), -index)
+        overlap = len(set(_stemmed(sentence)) & signal)
+        # Порядок важности: попадание в пожелания, затем целая фраза без обрезки,
+        # затем конкретика в цифрах — годы опыта и количество мероприятий.
+        key = (
+            overlap,
+            len(sentence) <= QUOTE_MAX_CHARS,
+            any(c.isdigit() for c in sentence),
+            -index,
+        )
         if best_key is None or key > best_key:
             best, best_key = sentence, key
     if best is None:
@@ -323,11 +371,13 @@ def _score(profile: dict, req: dict) -> tuple[float, dict]:
     else:
         budget_score = 0.5
 
-    signal = _words(req.get("free_text") or "") - _noise(req)
-    overlap = signal & _words(profile["description"])
-    facts["shared_words"] = sorted(overlap)[:5]
-    facts["quote"] = _quote(profile["description"], signal)
-    description_score = min(1.0, len(overlap) / 4)
+    noise_stems = {w[:5] for w in _noise(req)}
+    wish_stems = {k: v for k, v in _stemmed(req.get("free_text") or "").items() if k not in noise_stems}
+    described = _stemmed(profile["description"])
+    matched = sorted(described[stem] for stem in wish_stems if stem in described)
+    facts["shared_words"] = matched[:5]
+    facts["quote"] = _quote(profile["description"], set(wish_stems))
+    description_score = min(1.0, len(matched) / 3)
 
     # Чем уже специализация, тем точнее попадание в конкретный формат
     formats = profile["event_formats"]
@@ -351,6 +401,37 @@ def _score(profile: dict, req: dict) -> tuple[float, dict]:
         + WEIGHTS["languages"] * language_score
     )
     return round(total, 6), facts
+
+
+def _standouts(profile: dict, peers: list[dict], req: dict) -> list[str]:
+    """Чем этот подрядчик отличается от остальных прошедших отбор.
+
+    Без этого все карточки пишутся одним шаблоном «цена, формат, языки, часы»,
+    и на вопрос «почему он выше соседа» ответить нечем.
+    """
+    if len(peers) < 2:
+        return []
+    out = []
+    prices = [p["price_from_kzt"] for p in peers if p["price_from_kzt"]]
+    if profile["price_from_kzt"] and prices and profile["price_from_kzt"] == min(prices):
+        out.append(f"самый дешёвый из {len(peers)} подходящих")
+
+    for language in profile["languages"]:
+        if sum(language in p["languages"] for p in peers) == 1:
+            out.append(f"единственный работает на языке: {language}")
+
+    if len(profile["event_formats"]) == 1:
+        out.append(f"берёт только формат «{profile['event_formats'][0]}»")
+    elif len(profile["event_formats"]) == min(len(p["event_formats"]) for p in peers):
+        out.append("самая узкая специализация из подходящих")
+
+    hours = [p["max_hours"] for p in peers if p["max_hours"] is not None]
+    if profile["max_hours"] is not None and hours and profile["max_hours"] == max(hours) and len(set(hours)) > 1:
+        out.append(f"дольше всех на площадке: до {profile['max_hours']} ч")
+
+    if len(profile["languages"]) == max(len(p["languages"]) for p in peers) and len(profile["languages"]) > 1:
+        out.append(f"больше всех языков: {', '.join(profile['languages'])}")
+    return out[:3]
 
 
 def _card(profile: dict, score: float, facts: dict) -> dict:
@@ -476,7 +557,10 @@ def search_contractors(
     language: str | None = None,
     free_text: str | None = None,
 ):
-    req = _request(city, category, date, event_format, budget_kzt, duration_hours, language, free_text)
+    # Близость по описанию считаем от дословного текста человека, а не от аргумента модели:
+    # иначе пересказ пожеланий моделью менял бы порядок карточек (требование 5).
+    req = _request(city, category, date, event_format, budget_kzt, duration_hours,
+                   language, ctx.task or free_text)
     try:
         requested = _parse_date(req["date"])
     except ValueError:
@@ -514,15 +598,34 @@ def search_contractors(
         }
 
     scored = [(*_score(p, req), p) for p in passed]
-    # Тай-брейк по id: одинаковый счёт не должен давать разный порядок между запусками
-    scored.sort(key=lambda item: (-item[0], item[2]["id"]))
-    cards = [_card(p, s, f) for s, f, p in scored[:MAX_CARDS]]
+    # При равном счёте порядок решал идентификатор, и на вопрос «почему он выше» честным
+    # ответом было «по id». Сначала сравниваем по смыслу: дешевле, шире по языкам, уже
+    # специализация. Id остаётся последним, чтобы порядок всё равно был воспроизводим.
+    scored.sort(
+        key=lambda item: (
+            -item[0],
+            item[2]["price_from_kzt"] or 10**12,
+            -len(item[2]["languages"]),
+            len(item[2]["event_formats"]),
+            item[2]["id"],
+        )
+    )
+    cards = []
+    for value, facts, profile in scored[:MAX_CARDS]:
+        facts["standouts"] = _standouts(profile, passed, req)
+        cards.append(_card(profile, value, facts))
 
+    busy_now = sum(1 for p in pool if req["date"] in p["busy_dates"])
     result = {
         "outcome": "matched" if cards else "all_filtered_out",
         "request": req,
         "in_city_and_category": len(pool),
         "passed_filters": len(passed),
+        # Требование 16: разницу между датами видно и тогда, когда карточек всё равно три
+        "availability_note": (
+            f"в категории «{req['category']}» по городу {req['city']} всего {len(pool)}, "
+            f"на {_human_date(req['date'])} заняты {busy_now}"
+        ),
         "cards": cards,
         "rejected": rejected[:MAX_REJECTED_SHOWN],
         "rejected_by_reason": _count_reasons(rejected),
@@ -565,6 +668,7 @@ def _diagnose(req: dict, requested: dt.date) -> dict:
             "in_city_and_category": 0,
             "category_available_in": where,
             "note": f"категории «{req['category']}» в городе {req['city']} нет вообще",
+            "headline": f"категория «{req['category']}» в городе {req['city']}: в каталоге 0",
             "suggestions": [
                 f"в городе {req['city']} категории «{req['category']}» нет ни одного подрядчика"
             ]
@@ -575,11 +679,12 @@ def _diagnose(req: dict, requested: dt.date) -> dict:
             ),
         }
 
+    passed_now = len(passed)
     relaxed = {
-        key: _relaxed(req, key)
+        key: _relaxed(req, key, passed_now)
         for key in ("date", "budget_kzt", "event_format", "language", "duration_hours")
     }
-    nearby = _nearby_dates(req, requested)
+    nearby = _nearby_dates(req, requested, passed_now)
     budget_needed = _budget_needed(req)
     season = _season(req)
     # Всё время ответа съедает модель: инструменты отрабатывают за миллисекунду. Поэтому
@@ -595,7 +700,8 @@ def _diagnose(req: dict, requested: dt.date) -> dict:
         "single_change_helps": any(bool(v) for v in relaxed.values()),
         "budget_needed_kzt": budget_needed,
         # Готовые формулировки: модель их вплетает, а не сочиняет — меньше выдумок и быстрее ответ
-        "suggestions": _suggestions(req, relaxed, nearby, budget_needed),
+        "headline": _headline(req, len(pool), passed_now, _count_reasons(rejected)),
+        "suggestions": _suggestions(req, relaxed, nearby, budget_needed, len(pool), passed_now),
         "season_note": _season_note(req, season),
     }
 
@@ -631,28 +737,80 @@ def _human_date(iso: str) -> str:
     return f"{day.day} {_MONTHS_GENITIVE[day.month]}"
 
 
-def _suggestions(req: dict, relaxed: dict, nearby: list[dict], budget_needed: int | None) -> list[str]:
-    """Минимальные изменения запроса, каждое из которых само по себе даёт результат."""
+def _suggestions(req: dict, relaxed: dict, nearby: list[dict], budget_needed: int | None,
+                 pool_size: int, passed_now: int) -> list[str]:
+    """Изменения запроса, каждое из которых РЕАЛЬНО добавляет кандидатов.
+
+    Про формат не советуем ничего: «не берут этот формат» — это законный исход по ТЗ,
+    а не помеха, которую клиенту предлагают обойти.
+    """
     out = []
     if nearby:
         best = nearby[0]
-        out.append(f"перенести дату на {_human_date(best['date'])} — освободится {_people(best['available'])}")
+        out.append(
+            f"перенести дату на {_human_date(best['date'])} — подойдёт {_people(best['available'])}"
+        )
     if budget_needed and relaxed.get("budget_kzt"):
         out.append(
-            f"поднять бюджет до {_money(budget_needed)} — тогда подойдёт {_people(relaxed['budget_kzt'])}"
+            f"поднять бюджет до {_money(budget_needed)} — добавится {_people(relaxed['budget_kzt'])}"
         )
     if relaxed.get("language"):
-        out.append(f"снять требование по языку — тогда подойдёт {_people(relaxed['language'])}")
+        out.append(f"снять требование по языку — добавится {_people(relaxed['language'])}")
     if relaxed.get("duration_hours"):
-        out.append(f"снять требование по длительности — тогда подойдёт {_people(relaxed['duration_hours'])}")
-    if relaxed.get("event_format"):
-        out.append(
-            f"рассмотреть тех, кто не заявил формат «{req['event_format']}» явно — "
-            f"тогда подойдёт {_people(relaxed['event_format'])}"
-        )
+        out.append(f"снять требование по длительности — добавится {_people(relaxed['duration_hours'])}")
+
     if not out:
-        out.append("ни одно одиночное послабление не помогает: кандидаты не проходят сразу по нескольким условиям")
+        if passed_now and pool_size <= MAX_CARDS:
+            # Редкая категория: показали всех, кто есть. Это не неудача, а исчерпанность.
+            out.append(
+                f"это все подрядчики категории «{req['category']}» в городе {req['city']}: "
+                f"их {pool_size}, показаны все подходящие"
+            )
+        elif passed_now:
+            out.append("остальные кандидаты не проходят по условиям запроса")
+        else:
+            out.append(
+                "ни одно одиночное послабление не помогает: кандидаты не проходят "
+                "сразу по нескольким условиям"
+            )
+    out += _elsewhere_note(req)
     return out
+
+
+_REASON_LABELS = {
+    "busy": "заняты на эту дату",
+    "format": "не берут этот формат",
+    "budget": "дороже бюджета",
+    "language": "не работают на нужном языке",
+    "duration": "не тянут по длительности",
+}
+
+
+def _headline(req: dict, pool_size: int, passed_now: int, blocked: dict) -> str:
+    """Одна строка о том, кто кого отсеял. Собирается кодом: перечислять причины,
+    которых не было, модель не должна."""
+    head = (
+        f"категория «{req['category']}», город {req['city']}: в каталоге {pool_size}, "
+        f"подходят {passed_now}"
+    )
+    if not blocked:
+        return head
+    parts = [f"{_REASON_LABELS.get(code, code)} — {count}" for code, count in sorted(blocked.items())]
+    return head + "; " + ", ".join(parts)
+
+
+def _elsewhere_note(req: dict) -> list[str]:
+    """Где ещё есть эта категория. Для редких категорий это единственный полезный совет."""
+    elsewhere = {}
+    for profile in catalog():
+        if req["category"] in profile["categories"] and profile["city"] != req["city"]:
+            elsewhere[profile["city"]] = elsewhere.get(profile["city"], 0) + 1
+    if not elsewhere:
+        return []
+    return [
+        "в других городах эта категория тоже есть: "
+        + ", ".join(f"{city} — {count}" for city, count in sorted(elsewhere.items()))
+    ]
 
 
 def _season_note(req: dict, season: dict) -> str | None:
@@ -710,7 +868,8 @@ def diagnose_request(
     language: str | None = None,
     free_text: str | None = None,
 ):
-    req = _request(city, category, date, event_format, budget_kzt, duration_hours, language, free_text)
+    req = _request(city, category, date, event_format, budget_kzt, duration_hours,
+                   language, ctx.task or free_text)
     unknown = req.pop("_unknown", None)
     if unknown:
         field, value = next(iter(unknown.items()))
@@ -722,8 +881,8 @@ def diagnose_request(
     return _diagnose(req, requested)
 
 
-def _nearby_dates(req: dict, requested: dt.date) -> list[dict]:
-    """Ближайшие даты в окне ±14 дней, где подходящих становится больше."""
+def _nearby_dates(req: dict, requested: dt.date, passed_now: int = 0) -> list[dict]:
+    """Ближайшие даты в окне ±14 дней, где подходящих становится БОЛЬШЕ, чем сейчас."""
     found = []
     for delta in range(1, SHIFT_DAYS + 1):
         for shifted in (requested + dt.timedelta(days=delta), requested - dt.timedelta(days=delta)):
@@ -731,7 +890,7 @@ def _nearby_dates(req: dict, requested: dt.date) -> list[dict]:
                 continue
             probe = dict(req, date=shifted.isoformat())
             _, passed, _ = _shortlist(probe)
-            if passed:
+            if len(passed) > passed_now:
                 found.append({"date": shifted.isoformat(), "available": len(passed)})
     found.sort(key=lambda item: (abs((dt.date.fromisoformat(item["date"]) - requested).days), item["date"]))
     return found[:3]
@@ -748,12 +907,16 @@ def _budget_needed(req: dict) -> int | None:
     return cheapest if cheapest > req["budget_kzt"] else None
 
 
-def _relaxed(req: dict, key: str) -> int | None:
-    """Сколько кандидатов пройдёт, если снять ровно одно условие. None — оно не задано."""
+def _relaxed(req: dict, key: str, passed_now: int) -> int | None:
+    """Сколько кандидатов ПРИБАВИТСЯ, если снять ровно одно условие.
+
+    Абсолютное число здесь врёт: если подрядчик уже в выдаче, предлагать сдвинуть
+    дату «чтобы освободился один» бессмысленно — он и так показан.
+    """
     if not req.get(key):
         return None
     _, passed, _ = _shortlist(dict(req, **{key: None}))
-    return len(passed)
+    return max(0, len(passed) - passed_now)
 
 
 def _season(req: dict) -> dict:

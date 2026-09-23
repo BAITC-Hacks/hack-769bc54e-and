@@ -91,7 +91,7 @@ def advance(run_id):
 def _advance(run_id):
     domains.active()  # инструменты активного домена должны быть в реестре до первого вызова модели
     run = Run.objects.get(pk=run_id)
-    ctx = tools.RunContext(run_id=str(run.id), input_text=run.input_text)
+    ctx = tools.RunContext(run_id=str(run.id), input_text=run.input_text, task=run.task)
     try:
         run.status = Run.Status.RUNNING
         run.save(update_fields=["status"])

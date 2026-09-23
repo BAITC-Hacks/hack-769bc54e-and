@@ -303,9 +303,40 @@ class ContractorDomainTests(TestCase):
         self.assertEqual(d["outcome"], "no_category_in_city")
         self.assertTrue(any("Алматы" in line for line in d["suggestions"]))
 
-    def test_suggestions_are_phrased_as_counts_that_would_fit(self):
-        d = self.m.diagnose_request(self.ctx, **dict(self.base, date="2026-10-15", budget_kzt=400000))
-        self.assertTrue(all("подойдёт" in s or "освободится" in s or "не помогает" in s for s in d["suggestions"]))
+    def test_suggestions_never_offer_what_is_already_shown(self):
+        # Единственный флорист уже в выдаче — предлагать сдвинуть дату «чтобы освободился
+        # один» бессмысленно. Послабления считаются как прирост, а не как абсолютное число.
+        r = self.search(city="Алматы", category="Флорист", date="2026-10-15", budget_kzt=1000000)
+        shown = len(r["cards"])
+        if "diagnosis" not in r:
+            self.skipTest("на этой дате выдача полная")
+        for line in r["diagnosis"]["suggestions"]:
+            if "подойдёт" in line:
+                promised = int("".join(c for c in line.split("подойдёт")[1] if c.isdigit())[:2] or 0)
+                self.assertGreater(promised, shown, line)
+
+    def test_exhausted_rare_category_says_so_instead_of_advising(self):
+        r = self.search(city="Астана", category="Фото и видеобудки", date="2026-10-15", budget_kzt=10**9)
+        if "diagnosis" not in r:
+            self.skipTest("выдача полная")
+        joined = " ".join(r["diagnosis"]["suggestions"])
+        self.assertTrue("это все подрядчики" in joined or "не помогает" in joined
+                        or "перенести дату" in joined, joined)
+
+    def test_headline_lists_only_reasons_that_actually_happened(self):
+        r = self.search(category="Отель", date="2026-12-26", budget_kzt=3000000)
+        head = r["diagnosis"]["headline"]
+        self.assertIn("заняты на эту дату", head)
+        self.assertIn("дороже бюджета", head)
+        self.assertNotIn("не работают на нужном языке", head)
+        self.assertNotIn("не тянут по длительности", head)
+
+    def test_no_advice_to_ignore_the_requested_format(self):
+        # «Не берут этот формат» — законный исход по ТЗ, а не помеха, которую обходят
+        for kw in ({"date": "2026-10-15", "budget_kzt": 400000}, {"date": "2026-12-26"}):
+            r = self.search(**kw)
+            for line in r.get("diagnosis", {}).get("suggestions", []):
+                self.assertNotIn("не заявил формат", line)
 
     def test_mock_report_explains_itself_when_nothing_was_parsed(self):
         from .core.llm import _mock_report
@@ -330,3 +361,59 @@ class ContractorDomainTests(TestCase):
         standalone = self.m.diagnose_request(self.ctx, **kw)
         self.assertEqual(embedded["suggestions"], standalone["suggestions"])
         self.assertEqual(embedded["blocked_by"], standalone["blocked_by"])
+
+    def test_wishes_match_by_word_stem_not_exact_form(self):
+        # «интерактив» в пожелании и «интерактивы» в описании — одно и то же
+        r = self.search(date="2026-10-15", free_text="хочу интерактив с гостями")
+        matched = [w for c in r["cards"] for w in c["match"]["shared_words"]]
+        self.assertTrue(matched, "совпадений по основам не нашлось")
+
+    def test_shared_words_are_really_present_in_the_description(self):
+        r = self.search(date="2026-10-15", free_text="интерактив, сценарий и живая музыка")
+        for card in r["cards"]:
+            profile = next(p for p in self.m.catalog() if p["id"] == card["id"])
+            for word in card["match"]["shared_words"]:
+                self.assertIn(word[:5], profile["description"].lower())
+
+    def test_quote_is_never_a_greeting_or_contact_boilerplate(self):
+        for profile in self.m.catalog():
+            quote = self.m._quote(profile["description"], set())
+            if quote:
+                self.assertFalse(quote.lower().startswith("меня зовут"), quote)
+                self.assertNotIn("whatsapp", quote.lower())
+
+    def test_availability_note_differs_between_dates(self):
+        quiet = self.search(date="2026-10-15")["availability_note"]
+        busy = self.search(date="2026-12-26")["availability_note"]
+        self.assertNotEqual(quiet, busy)
+
+    def test_cards_carry_comparative_facts(self):
+        cards = self.search(date="2026-10-15")["cards"]
+        self.assertEqual(len(cards), 3)
+        self.assertTrue(any(c["match"]["standouts"] for c in cards))
+
+    def test_equal_scores_are_ordered_by_meaning_not_by_id(self):
+        cards = self.search(date="2026-10-15")["cards"]
+        tied = [c for c in cards if abs(c["score"] - cards[-1]["score"]) < 1e-9]
+        if len(tied) < 2:
+            self.skipTest("на этом запросе равных счётов нет")
+        prices = [c["price_from_kzt"] or 10**12 for c in tied]
+        self.assertEqual(prices, sorted(prices), "равные счёта должны идти от дешёвого к дорогому")
+
+    def test_ranking_uses_the_human_text_not_the_model_argument(self):
+        # Модель может пересказать пожелания своими словами; порядок карточек от этого
+        # меняться не должен — сигнал берётся из постановки задачи (требование 5).
+        human = "Нужен ведущий на свадьбу в Алматы, хочу интерактив с гостями"
+        ctx = tools.RunContext(run_id="t", input_text="", task=human)
+        with_paraphrase = self.m.search_contractors(
+            ctx, city="Алматы", category="Ведущий", date="2026-10-15",
+            event_format="свадьба", budget_kzt=900000, free_text="весёлый ведущий",
+        )
+        without = self.m.search_contractors(
+            ctx, city="Алматы", category="Ведущий", date="2026-10-15",
+            event_format="свадьба", budget_kzt=900000,
+        )
+        self.assertEqual(
+            [c["id"] for c in with_paraphrase["cards"]],
+            [c["id"] for c in without["cards"]],
+        )
