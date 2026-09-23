@@ -294,3 +294,21 @@ class ContractorDomainTests(TestCase):
 
         self.assertIn("Mock-режим", _mock_report({}))
         self.assertIn("пример", _mock_report({}))
+
+    def test_search_carries_the_diagnosis_when_fewer_than_three(self):
+        # Объяснение «почему мало» не должно зависеть от второго вызова модели
+        r = self.search(category="Отель", date="2026-12-26", budget_kzt=3000000)
+        self.assertIn("diagnosis", r)
+        self.assertTrue(r["diagnosis"]["suggestions"])
+
+    def test_search_does_not_diagnose_when_there_are_three(self):
+        r = self.search(date="2026-10-15")
+        self.assertEqual(len(r["cards"]), 3)
+        self.assertNotIn("diagnosis", r)
+
+    def test_embedded_diagnosis_matches_the_standalone_tool(self):
+        kw = dict(self.base, category="Отель", date="2026-12-26", budget_kzt=3000000)
+        embedded = self.m.search_contractors(self.ctx, **kw)["diagnosis"]
+        standalone = self.m.diagnose_request(self.ctx, **kw)
+        self.assertEqual(embedded["suggestions"], standalone["suggestions"])
+        self.assertEqual(embedded["blocked_by"], standalone["blocked_by"])

@@ -31,6 +31,7 @@ import argparse
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -126,6 +127,8 @@ def main() -> int:
     parser.add_argument("--limit", type=int)
     parser.add_argument("--real", action="store_true", help="использовать настоящую модель")
     parser.add_argument("--out", default=str(BACKEND.parent / "docs/EVAL.md"))
+    # Требование 13 ТЗ: ответ за разумное время, ориентир — 10 секунд
+    parser.add_argument("--max-seconds", type=float, default=10.0)
     args = parser.parse_args()
 
     if not args.real:
@@ -142,26 +145,36 @@ def main() -> int:
         print("В cases.json нет кейсов. Заполните его материалом Задачи.")
         return 1
 
-    rows, passed, tokens = [], 0, 0
+    rows, passed, tokens, slowest = [], 0, 0, 0.0
     for case in cases:
+        started = time.time()
         run = run_case(case["task"], case.get("input", ""), case.get("approve", True))
+        elapsed = time.time() - started
+        slowest = max(slowest, elapsed)
         ok, problems = check(case, run)
         problems += check_compare(case, run)
+        # Время меряем только с настоящей моделью: в mock отвечает заглушка
+        if args.real and elapsed > args.max_seconds:
+            problems.append(f"{elapsed:.1f} с при пороге {args.max_seconds:.0f}")
         ok = not problems
         passed += ok
         tokens += run.prompt_tokens + run.completion_tokens
-        rows.append((case["id"], ok, run.llm_calls, "; ".join(problems) or "—"))
+        rows.append((case["id"], ok, elapsed, run.llm_calls, "; ".join(problems) or "—"))
         print(("PASS " if ok else "FAIL ") + case["id"] + ("" if ok else ": " + "; ".join(problems)))
 
     md = [
         "# Результаты прогона",
         "",
         f"Кейсов: {len(rows)} · прошло: {passed} · точность: **{passed / len(rows) * 100:.0f}%**",
-        f"Режим: {'настоящая модель ' + settings.OPENAI_MODEL if args.real else 'mock'} · токенов: {tokens}",
+        f"Режим: {'настоящая модель ' + settings.OPENAI_MODEL if args.real else 'mock'} · "
+        f"токенов: {tokens} · самый долгий ответ: {slowest:.1f} с при пороге {args.max_seconds:.0f} с",
         "",
-        "| Кейс | Результат | Вызовов модели | Замечания |",
-        "|---|---|---|---|",
-        *[f"| {i} | {'✅' if ok else '❌'} | {calls} | {note} |" for i, ok, calls, note in rows],
+        "| Кейс | Результат | Время | Вызовов модели | Замечания |",
+        "|---|---|---|---|---|",
+        *[
+            f"| {i} | {'✅' if ok else '❌'} | {sec:.1f} с | {calls} | {note} |"
+            for i, ok, sec, calls, note in rows
+        ],
     ]
     Path(args.out).write_text("\n".join(md) + "\n", encoding="utf-8")
     print(f"\n{passed}/{len(rows)} · отчёт: {args.out}")

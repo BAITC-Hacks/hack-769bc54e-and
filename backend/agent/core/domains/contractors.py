@@ -43,8 +43,9 @@ How to work here:
 - Call search_contractors once with the parameters from the request. It applies the hard
   filters and the ranking itself and returns at most three candidates together with the
   computed match facts. Never reorder its result: the order is part of the contract.
-- If it returns fewer than three candidates or none at all, call diagnose_request to find
-  out what exactly blocked them and what single change to the request would help.
+- When it returns fewer than three candidates, its answer already carries a `diagnosis`
+  block with the ready wording. Use it; a second tool call is not needed. Call
+  diagnose_request only if you want to probe a different request than the one you searched.
 - Do not offer booking, applications or notifications: this service only recommends.
 - Never reorder, drop or add candidates. The catalog decides who is shown and in what order;
   your job is only to say why each of them is there.
@@ -59,10 +60,10 @@ Write the answer in Russian, in Markdown, in exactly this shape and nothing else
 2. A numbered list, one item per returned card, in the order the catalog returned them.
    Each item: `**Имя** — one or two sentences of explanation.`
 3. If there are fewer than three cards, a closing block: one line saying how many there are
-   and which condition blocked whom, then **every** line of `suggestions`, each as its own
+   and which condition blocked whom, then **every** line of `diagnosis.suggestions`, each as its own
    bullet, reproduced word for word. Not a summary of them, not a selection — all of them.
    They already contain the right numbers, dates and city names; inventing your own is a defect.
-   When `season_note` is present, add it after the bullets: a thin month is the season,
+   When `diagnosis.season_note` is present, add it after the bullets: a thin month is the season,
    not a failure.
 
 Rules for the explanations:
@@ -82,18 +83,36 @@ Rules for the explanations:
 """
 
 SAMPLES = [
+    # Требование 17 ТЗ: плотная категория на осеннюю дату, где ранжирование реально работает.
+    # Даёт три карточки и два вызова модели вместо трёх — это же и самый быстрый сценарий.
     {
         "id": "dense",
-        "label": "Ведущий, Алматы, 14 ноября",
-        "task": "Нужен ведущий на той в Алматы 14 ноября 2026, бюджет 900000 тенге, желательно на казахском.",
+        "label": "Ведущий на свадьбу, 15 октября",
+        "task": "Нужен ведущий на свадьбу в Алматы 15 октября 2026, бюджет 900000 тенге.",
         "input": "",
     },
+    # Требование 9: площадка — такой же запрос, только категория другая
+    {
+        "id": "venue",
+        "label": "Банкетный зал, 24 октября",
+        "task": "Подобрать банкетный зал в Алматы на свадьбу 24 октября 2026, бюджет 3000000 тенге.",
+        "input": "",
+    },
+    # Требование 17: редкая категория — всего три профиля в каталоге
+    {
+        "id": "rare",
+        "label": "Инструменталист — редкая категория",
+        "task": "Нужен инструменталист на свадьбу в Алматы 15 октября 2026, бюджет 1000000 тенге.",
+        "input": "",
+    },
+    # Требование 12, исход «кандидаты есть, но ни один не проходит»
     {
         "id": "all-busy",
         "label": "Отель на 26 декабря — все заняты",
         "task": "Подбери отель в Алматы на свадьбу 26 декабря 2026, бюджет 3000000 тенге.",
         "input": "",
     },
+    # Требование 12, исход «в этом городе такой категории нет»
     {
         "id": "no-category",
         "label": "Лайв-бэнд в Астане — которого нет",
@@ -285,7 +304,7 @@ def _card(profile: dict, score: float, facts: dict) -> dict:
         "categories": profile["categories"],
         "city": profile["city"],
         "price_from_kzt": profile["price_from_kzt"],
-        "description": profile["description"][:400],
+        "description": profile["description"][:200],
         "score": score,
         "match": facts,
         # Флаги честности: показываются в карточке, чтобы не выдавать проставленные данные за настоящие
@@ -317,6 +336,19 @@ def _shortlist(req: dict) -> tuple[list[dict], list[dict], list[dict]]:
 # --------------------------------------------------------------------------
 # Инструменты
 # --------------------------------------------------------------------------
+
+def _request(city, category, date, event_format, budget_kzt, duration_hours, language, free_text) -> dict:
+    return {
+        "city": city.strip(),
+        "category": category.strip(),
+        "date": date.strip(),
+        "event_format": event_format.strip(),
+        "budget_kzt": int(budget_kzt),
+        "duration_hours": duration_hours,
+        "language": (language or "").strip() or None,
+        "free_text": free_text or "",
+    }
+
 
 _SEARCH_SCHEMA = {
     "type": "object",
@@ -357,16 +389,7 @@ def search_contractors(
     language: str | None = None,
     free_text: str | None = None,
 ):
-    req = {
-        "city": city.strip(),
-        "category": category.strip(),
-        "date": date.strip(),
-        "event_format": event_format.strip(),
-        "budget_kzt": int(budget_kzt),
-        "duration_hours": duration_hours,
-        "language": (language or "").strip() or None,
-        "free_text": free_text or "",
-    }
+    req = _request(city, category, date, event_format, budget_kzt, duration_hours, language, free_text)
     try:
         requested = _parse_date(req["date"])
     except ValueError:
@@ -382,6 +405,7 @@ def search_contractors(
             "in_city_and_category": 0,
             "cards": [],
             "note": f"в городе {req['city']} нет ни одного подрядчика категории «{req['category']}»",
+            "diagnosis": _diagnose(req, requested),
         }
 
     scored = [(*_score(p, req), p) for p in passed]
@@ -404,6 +428,10 @@ def search_contractors(
         )
     if len(cards) < MAX_CARDS:
         result["fewer_than_three"] = True
+        # Диагностика приезжает сразу, а не вторым вызовом: объяснение, почему подходящих
+        # мало, обязано быть в ответе всегда, а не когда модель догадается спросить.
+        # Заодно это один вызов модели вместо двух — требование 13 про время.
+        result["diagnosis"] = _diagnose(req, requested)
     return result
 
 
@@ -416,39 +444,10 @@ def _count_reasons(rejected: list[dict]) -> dict:
     return counts
 
 
-@tool(
-    "diagnose_request",
-    "Explain why a request returns fewer than three contractors and what single change to the "
-    "request would help: another date within two weeks, a higher budget, or dropping the language "
-    "or duration requirement. Call it whenever search_contractors returns fewer than three cards.",
-    _SEARCH_SCHEMA,
-)
-def diagnose_request(
-    ctx: RunContext,
-    city: str,
-    category: str,
-    date: str,
-    event_format: str,
-    budget_kzt: int,
-    duration_hours: int | None = None,
-    language: str | None = None,
-    free_text: str | None = None,
-):
-    req = {
-        "city": city.strip(),
-        "category": category.strip(),
-        "date": date.strip(),
-        "event_format": event_format.strip(),
-        "budget_kzt": int(budget_kzt),
-        "duration_hours": duration_hours,
-        "language": (language or "").strip() or None,
-        "free_text": free_text or "",
-    }
-    try:
-        requested = _parse_date(req["date"])
-    except ValueError:
-        return {"error": f"дата «{req['date']}» не в формате ГГГГ-ММ-ДД"}
-
+def _diagnose(req: dict, requested: dt.date) -> dict:
+    """Почему подходящих меньше трёх и что изменить. Возвращается и отдельным
+    инструментом, и вместе с поиском — чтобы результат не зависел от того,
+    догадается ли модель сделать второй вызов."""
     pool, passed, rejected = _shortlist(req)
     if not pool:
         elsewhere = {}
@@ -478,6 +477,9 @@ def diagnose_request(
     nearby = _nearby_dates(req, requested)
     budget_needed = _budget_needed(req)
     season = _season(req)
+    # Всё время ответа съедает модель: инструменты отрабатывают за миллисекунду. Поэтому
+    # в диагностику не попадает ничего, что уже вернул поиск, и ничего, из чего мы сами
+    # собрали готовую строку: помесячные средние живут в season_note, отсев — в rejected поиска.
     return {
         "outcome": "matched" if passed else "all_filtered_out",
         "in_city_and_category": len(pool),
@@ -486,13 +488,10 @@ def diagnose_request(
         # Сколько кандидатов появится, если снять ровно одно условие. None — оно не задано.
         "if_relaxed": relaxed,
         "single_change_helps": any(bool(v) for v in relaxed.values()),
-        "nearby_dates": nearby,
         "budget_needed_kzt": budget_needed,
-        "season_context": season,
         # Готовые формулировки: модель их вплетает, а не сочиняет — меньше выдумок и быстрее ответ
         "suggestions": _suggestions(req, relaxed, nearby, budget_needed),
         "season_note": _season_note(req, season),
-        "rejected": rejected[:MAX_REJECTED_SHOWN],
     }
 
 
@@ -584,6 +583,34 @@ _MONTHS_PREPOSITIONAL = {
 
 def _month_name(month: str) -> str:
     return _MONTHS_PREPOSITIONAL.get(month[-2:], month)
+
+
+
+
+@tool(
+    "diagnose_request",
+    "Explain why a request returns fewer than three contractors and what single change to the "
+    "request would help: another date within two weeks, a higher budget, or dropping the language "
+    "or duration requirement. Call it whenever search_contractors returns fewer than three cards.",
+    _SEARCH_SCHEMA,
+)
+def diagnose_request(
+    ctx: RunContext,
+    city: str,
+    category: str,
+    date: str,
+    event_format: str,
+    budget_kzt: int,
+    duration_hours: int | None = None,
+    language: str | None = None,
+    free_text: str | None = None,
+):
+    req = _request(city, category, date, event_format, budget_kzt, duration_hours, language, free_text)
+    try:
+        requested = _parse_date(req["date"])
+    except ValueError:
+        return {"error": f"дата «{req['date']}» не в формате ГГГГ-ММ-ДД"}
+    return _diagnose(req, requested)
 
 
 def _nearby_dates(req: dict, requested: dt.date) -> list[dict]:
@@ -688,6 +715,7 @@ def _guess(request: str) -> dict | None:
     # Пробелы убираем, чтобы «900 000» читалось как одно число; границы слова тут мешают:
     # в «900000тенге» между цифрой и буквой их нет.
     budget = re.search(r"(\d{5,9})", request.replace(" ", "").replace("\u00a0", ""))
+    hours = re.search(r"\b(\d{1,2})\s*(?:ч\b|час|часа|часов)", low)
 
     if not (city and fmt and category and day and budget):
         return None
@@ -697,6 +725,7 @@ def _guess(request: str) -> dict | None:
         "date": day,
         "event_format": fmt,
         "budget_kzt": int(budget.group(1)),
+        "duration_hours": int(hours.group(1)) if hours else None,
         "language": language,
         "free_text": request,
     }
