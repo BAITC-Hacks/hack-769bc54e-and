@@ -11,7 +11,7 @@ import type { ContractorCard, Run, SearchResult } from "@/lib/types";
 function HonestyBadges({ card }: { card: ContractorCard }) {
   return (
     <div className="honesty-badges" aria-label={HONESTY_TEXT.sectionLabel}>
-      <span className={`honesty-badge ${card.flags.synthetic ? "honesty-badge-team" : "honesty-badge-source"}`}>
+      <span className={`honesty-badge ${card.flags.synthetic ? "honesty-badge-synthetic" : "honesty-badge-source"}`}>
         {card.flags.synthetic ? HONESTY_TEXT.syntheticProfile : HONESTY_TEXT.sourceProfile}
       </span>
       {card.flags.price_imputed && <span className="honesty-badge honesty-badge-estimate">{HONESTY_TEXT.imputedPrice}</span>}

@@ -136,10 +136,15 @@ export const STATUS_TEXT: Record<RunStatus, string> = {
   failed: "Остановлено с ошибкой",
 };
 
+/**
+ * Плашки честности (R22). Все флаги пришли в датасете организатора: synthetic — 13 профилей,
+ * цена и город проставлены при подготовке у 18 и 8. Своих профилей команда не добавляла
+ * (README, допущение 9) — поэтому ни одна подпись не говорит «командой».
+ */
 export const HONESTY_TEXT = {
   sectionLabel: "Происхождение данных подрядчиков",
-  sourceProfile: "Исходный профиль",
-  syntheticProfile: "Добавлен командой",
+  sourceProfile: "Настоящий профиль",
+  syntheticProfile: "Синтетический профиль",
   imputedPrice: "Цена ориентировочная",
-  imputedCity: "Город указан командой",
+  imputedCity: "Город ориентировочный",
 } as const;

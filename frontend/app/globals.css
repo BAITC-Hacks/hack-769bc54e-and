@@ -208,7 +208,7 @@ textarea.mono { font: 400 0.8125rem/1.6 var(--mono); white-space: pre; overflow-
   line-height: 1.2;
 }
 .honesty-badge-source { color: var(--clear); background: #dcefe9; }
-.honesty-badge-team { color: #76510c; background: var(--gate-soft); }
+.honesty-badge-synthetic { color: #76510c; background: var(--gate-soft); }
 .honesty-badge-estimate { color: var(--muted); background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); }
 
 details summary { cursor: pointer; font-size: 0.9375rem; color: var(--muted); width: fit-content; }
