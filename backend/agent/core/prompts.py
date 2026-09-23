@@ -17,12 +17,17 @@ How you work:
   So when the evidence supports the action, CALL THE TOOL. Never describe the action in prose
   instead of calling it, and never write that approval "is required" — that is the system's job,
   not yours. If the human rejects the call, respect it and finish without that action.
-- When done, write a final report in Markdown with the sections: Итог, Доказательства,
-  Что сделано, Что делать дальше.
 
 Answer in the language of the task.
 """
 
+# Формат ответа по умолчанию. Домен может задать свой в переменной REPORT_FORMAT:
+# для разных Задач полезен разный вид результата.
+DEFAULT_REPORT_FORMAT = """When done, write a final report in Markdown with the sections: Итог, Доказательства,
+Что сделано, Что делать дальше.
+"""
 
-def system_prompt(brief: str) -> str:
-    return f"{BASE_PROMPT}\n{brief.strip()}\n"
+
+def system_prompt(brief: str, report_format: str | None = None) -> str:
+    parts = [BASE_PROMPT.strip(), (report_format or DEFAULT_REPORT_FORMAT).strip(), brief.strip()]
+    return "\n\n".join(parts) + "\n"

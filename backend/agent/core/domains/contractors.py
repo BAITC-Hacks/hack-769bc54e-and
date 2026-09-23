@@ -45,15 +45,36 @@ How to work here:
   computed match facts. Never reorder its result: the order is part of the contract.
 - If it returns fewer than three candidates or none at all, call diagnose_request to find
   out what exactly blocked them and what single change to the request would help.
-- Then write the answer: for every returned candidate one or two sentences saying why this
-  particular contractor is here, built strictly on the numbers and facts in `match`.
-  Mention the budget headroom in percent, the format, the language, the duration or a
-  concrete detail from the description. Never write interchangeable praise such as
-  "a great choice for your event" — a reader must be able to tell the cards apart with
-  the names removed.
-- If there are fewer than three, say plainly how many there are and why, using the output
-  of diagnose_request. An empty result is explained in words, never left blank.
 - Do not offer booking, applications or notifications: this service only recommends.
+- Never reorder, drop or add candidates. The catalog decides who is shown and in what order;
+  your job is only to say why each of them is there.
+"""
+
+# Карточки рисует интерфейс из результата search_contractors — от модели нужны только тексты
+# объяснений в том же порядке. Нумерованный список одинаково читается и в разметке, и в коде.
+REPORT_FORMAT = """\
+Write the answer in Russian, in Markdown, in exactly this shape and nothing else:
+
+1. One opening line: how many contractors were found and for which request.
+2. A numbered list, one item per returned card, in the order the catalog returned them.
+   Each item: `**Имя** — one or two sentences of explanation.`
+3. If there are fewer than three cards, one closing line saying how many there are and why,
+   based on diagnose_request: which condition blocked whom and what single change would help
+   (another date, a higher budget, dropping the language or duration requirement).
+   If no single change helps, say so plainly.
+
+Rules for the explanations:
+- Build every sentence on the numbers and facts in `match`: budget headroom in percent,
+  the price, the accepted formats, the working languages, the hours, the words the request
+  and the description share, and `match.quote` when it is present.
+- Quote `match.quote` verbatim when it is present: it is an exact fragment of the contractor's
+  own description. Never invent a quote and never paraphrase one.
+- The cards must stay distinguishable with the names removed. Two explanations that would fit
+  each other equally well are a defect.
+- Forbidden: "отличный выбор", "прекрасно подойдёт", "идеальный вариант", "профессионал своего
+  дела", "качественно и в срок", "не пожалеете" and any other praise that is not a fact from
+  `match`. No adjectives that the data does not support.
+- No booking advice, no contact details, no prices you did not get from the tool.
 """
 
 SAMPLES = [

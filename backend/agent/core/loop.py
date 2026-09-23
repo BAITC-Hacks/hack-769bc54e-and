@@ -36,7 +36,7 @@ def create_run(task: str, input_text: str = "") -> Run:
         task=task,
         input_text=input_text,
         messages=[
-            {"role": "system", "content": system_prompt(domain.BRIEF)},
+            {"role": "system", "content": system_prompt(domain.BRIEF, getattr(domain, "REPORT_FORMAT", None))},
             {"role": "user", "content": user},
         ],
     )
