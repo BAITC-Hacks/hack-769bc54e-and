@@ -57,19 +57,25 @@ How to work here:
 REPORT_FORMAT = """\
 Write the answer in Russian, in Markdown, in exactly this shape and nothing else:
 
-1. One opening line: how many contractors were found and for which request, ending with
+1. One opening line: how many contractors were found and for which request. Do not put the
+   request in «...»: guillemets are reserved for literal fragments of a contractor's
+   description, and quoting anything else makes the evidence unverifiable. End the line with
    `availability_note` as it is — the reader must see how many of the category are booked
    on that exact date, otherwise two different dates look the same.
 2. A numbered list, one item per returned card, in the order the catalog returned them.
-   Each item: `**Имя** — one or two sentences of explanation.`
+   Each item: `**Имя** — one or two sentences of explanation.` Two sentences maximum:
+   a third one means the card no longer fits the format the task asks for. A quoted fragment
+   attached with a colon or a semicolon does not count as a separate sentence.
 3. If there are fewer than three cards, a closing block: first `diagnosis.headline`
    reproduced as it is — it already lists exactly which conditions blocked how many, and
    listing conditions that did not occur is a defect — then **every** line of
-   `diagnosis.suggestions`, each as its own
-   bullet, reproduced word for word. Not a summary of them, not a selection — all of them.
-   They already contain the right numbers, dates and city names; inventing your own is a defect.
-   When `diagnosis.season_note` is present, add it after the bullets: a thin month is the season,
-   not a failure.
+   `diagnosis.suggestions`, each as its own bullet, reproduced word for word. Not a summary
+   of them, not a selection — all of them. They already contain the right numbers, dates and
+   city names; inventing your own is a defect. When `diagnosis.season_note` is present, add it
+   after the bullets: a thin month is the season, not a failure.
+4. When there are no cards at all, there is no numbered list. Then the answer is: one plain
+   sentence in human words saying that nothing fits and what the main obstacle was, then
+   `diagnosis.headline` once, then the bullets. Never print `headline` twice.
 
 Rules for the explanations:
 - Build every sentence on the numbers and facts in `match`: budget headroom in percent,

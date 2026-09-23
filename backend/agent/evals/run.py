@@ -18,7 +18,9 @@
         "absent": ["подстрока", ...],       // чего в отчёте быть не должно
         "tool_result_contains": ["..."],    // что обязано быть в ответе инструмента,
                                             // а не в тексте модели: детерминированная гарантия
-        "approval": true                     // обязан ли остановиться на подтверждении
+        "approval": true,                    // обязан ли остановиться на подтверждении
+        "max_sentences": 2,                  // предел на объяснение в карточке
+        "skip_explanation_checks": false     // выключить проверки качества для этого кейса
       },
       "compare": {                           // необязательно: второй запрос для сравнения
         "task": "тот же запрос с другой датой",
@@ -29,6 +31,7 @@
 """
 import argparse
 import json
+import re
 import os
 import sys
 import time
@@ -107,6 +110,73 @@ def check_compare(case: dict, run) -> list[str]:
     return problems
 
 
+
+# --- Качество объяснений: то, что ТЗ проверяет глазами, проверяем прогоном ----------
+
+_ITEM = re.compile(r"^\s*\d+\.\s+(.*)$", re.M)
+_NAME = re.compile(r"^\*\*[^*]+\*\*\s*[—–-]\s*")
+_QUOTED = re.compile(r"[«\"]([^«»\"]{25,})[»\"]")
+_SENTENCE_END = re.compile(r"[.!?](?:\s|$)")
+
+
+def explanations(report: str) -> list[str]:
+    """Тексты карточек без имён — ровно то, что останется при проверке «сотрите имена»."""
+    return [_NAME.sub("", item).strip() for item in _ITEM.findall(report or "")]
+
+
+def _facts(text: str) -> set[str]:
+    """Проверяемые кусочки: числа и длинные слова. Общие слова шаблона отсекаются длиной."""
+    numbers = set(re.findall(r"\d[\d\s]*", text))
+    words = {w.lower() for w in re.findall(r"[^\W\d_]{6,}", text)}
+    return {n.replace(" ", "") for n in numbers} | words
+
+
+def check_explanations(case: dict, run) -> list[str]:
+    """Требования 5 и 14 ТЗ: не длиннее двух предложений и попарно неперепутываемы."""
+    expect = case.get("expect") or {}
+    if expect.get("skip_explanation_checks"):
+        return []
+    items = explanations(run.final_report or "")
+    if len(items) < 2:
+        return []
+
+    problems = []
+    limit = expect.get("max_sentences", 2)
+    for i, text in enumerate(items, 1):
+        # Точка внутри цитаты — не конец авторского предложения: цитата это
+        # доказательство, а не ещё одна фраза от модели.
+        own_words = _QUOTED.sub("", text)
+        sentences = len([x for x in _SENTENCE_END.split(own_words) if x.strip()])
+        if sentences > limit:
+            problems.append(f"карточка {i}: {sentences} предложения при пределе {limit}")
+
+    facts = [_facts(t) for t in items]
+    for i, own in enumerate(facts, 1):
+        others = set().union(*(f for j, f in enumerate(facts, 1) if j != i))
+        if not (own - others):
+            problems.append(f"карточка {i} не отличима от остальных: своих фактов нет")
+    return problems
+
+
+def check_quotes_are_real(run) -> list[str]:
+    """Всё, что подано в кавычках, обязано быть в ответе инструмента.
+
+    Прямая защита от выдуманных цитат и совпадений: модель может пересказать факты,
+    но не имеет права сослаться на текст, которого в каталоге нет.
+    """
+    from agent.models import Step
+
+    blob = json.dumps(
+        [s.content for s in run.steps.filter(kind=Step.Kind.TOOL_RESULT)], ensure_ascii=False
+    )
+    problems = []
+    for quoted in _QUOTED.findall(run.final_report or ""):
+        head = quoted.strip()[:40]
+        if head and head not in blob:
+            problems.append(f"цитаты «{head}…» нет в ответе инструмента")
+    return problems
+
+
 def load_cases(limit: int | None) -> list[dict]:
     """Кейсы активного домена: cases.<домен>.json, иначе общий cases.json."""
     from django.conf import settings
@@ -155,6 +225,8 @@ def main() -> int:
         slowest = max(slowest, elapsed)
         ok, problems = check(case, run)
         problems += check_compare(case, run)
+        problems += check_explanations(case, run)
+        problems += check_quotes_are_real(run)
         # Время меряем только с настоящей моделью: в mock отвечает заглушка
         if args.real and elapsed > args.max_seconds * 1.5:
             problems.append(f"{elapsed:.1f} с при ориентире {args.max_seconds:.0f}")
