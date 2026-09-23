@@ -2,7 +2,8 @@
 # (на Windows его обычно нет). `python scripts/dev.py <цель>` делает ровно то же самое.
 .PHONY: setup backend frontend test typecheck check verify
 
-PYTHON ?= python
+# На macOS и Linux часто есть только python3 — берём его, иначе python (Windows)
+PYTHON ?= $(shell command -v python3 >/dev/null 2>&1 && echo python3 || echo python)
 
 setup:            ## один раз после clone
 	$(PYTHON) scripts/dev.py setup
