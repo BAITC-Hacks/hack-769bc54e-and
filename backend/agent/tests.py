@@ -267,3 +267,22 @@ class ContractorDomainTests(TestCase):
     def test_quote_selection_is_deterministic(self):
         quotes = {tuple(c["match"]["quote"] or "" for c in self.search(date="2026-10-15")["cards"]) for _ in range(5)}
         self.assertEqual(len(quotes), 1)
+
+    def test_missing_category_suggests_where_it_exists(self):
+        d = self.m.diagnose_request(self.ctx, **dict(self.base, city="Астана", category="Лайв-бэнд"))
+        self.assertTrue(any("Алматы" in line for line in d["suggestions"]))
+
+    def test_category_absent_everywhere_still_gets_a_suggestion(self):
+        d = self.m.diagnose_request(self.ctx, **dict(self.base, category="Дрессировщик тигров"))
+        self.assertEqual(d["outcome"], "no_category_in_city")
+        self.assertTrue(any("в других городах" in line for line in d["suggestions"]))
+
+    def test_suggestions_are_phrased_as_counts_that_would_fit(self):
+        d = self.m.diagnose_request(self.ctx, **dict(self.base, date="2026-10-15", budget_kzt=400000))
+        self.assertTrue(all("подойдёт" in s or "освободится" in s or "не помогает" in s for s in d["suggestions"]))
+
+    def test_mock_report_explains_itself_when_nothing_was_parsed(self):
+        from .core.llm import _mock_report
+
+        self.assertIn("Mock-режим", _mock_report({}))
+        self.assertIn("пример", _mock_report({}))

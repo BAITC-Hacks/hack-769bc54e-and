@@ -14,7 +14,7 @@
 """
 import csv
 import re
-from datetime import date, timedelta
+import datetime as dt
 from functools import lru_cache
 from pathlib import Path
 
@@ -23,8 +23,8 @@ from ..tools import RunContext, tool
 DATA = Path(__file__).resolve().parents[2] / "data" / "contractors.csv"
 
 # Окно, для которого в датасете есть календарь занятости
-WINDOW_START = date(2026, 9, 23)
-WINDOW_END = date(2026, 12, 31)
+WINDOW_START = dt.date(2026, 9, 23)
+WINDOW_END = dt.date(2026, 12, 31)
 
 MAX_CARDS = 3
 MAX_REJECTED_SHOWN = 8
@@ -139,8 +139,8 @@ def catalog() -> tuple[dict, ...]:
     return tuple(rows)
 
 
-def _parse_date(value: str) -> date:
-    return date.fromisoformat(value.strip())
+def _parse_date(value: str) -> dt.date:
+    return dt.date.fromisoformat(value.strip())
 
 
 # --------------------------------------------------------------------------
@@ -464,8 +464,11 @@ def diagnose_request(
             "suggestions": [
                 f"в городе {req['city']} категории «{req['category']}» нет ни одного подрядчика"
             ]
-            + [f"в городе {city} их {elsewhere[city]}" for city in where]
-            or [f"категории «{req['category']}» нет нигде в каталоге"],
+            + (
+                [f"в городе {city} их {elsewhere[city]}" for city in where]
+                if where
+                else [f"категории «{req['category']}» нет и в других городах каталога"]
+            ),
         }
 
     relaxed = {
@@ -520,7 +523,7 @@ def _money(amount: int) -> str:
 
 
 def _human_date(iso: str) -> str:
-    day = date.fromisoformat(iso)
+    day = dt.date.fromisoformat(iso)
     return f"{day.day} {_MONTHS_GENITIVE[day.month]}"
 
 
@@ -532,15 +535,16 @@ def _suggestions(req: dict, relaxed: dict, nearby: list[dict], budget_needed: in
         out.append(f"перенести дату на {_human_date(best['date'])} — освободится {_people(best['available'])}")
     if budget_needed and relaxed.get("budget_kzt"):
         out.append(
-            f"поднять бюджет до {_money(budget_needed)} — пройдёт {_people(relaxed['budget_kzt'])}"
+            f"поднять бюджет до {_money(budget_needed)} — тогда подойдёт {_people(relaxed['budget_kzt'])}"
         )
     if relaxed.get("language"):
-        out.append(f"снять требование по языку — пройдёт {_people(relaxed['language'])}")
+        out.append(f"снять требование по языку — тогда подойдёт {_people(relaxed['language'])}")
     if relaxed.get("duration_hours"):
-        out.append(f"снять требование по длительности — пройдёт {_people(relaxed['duration_hours'])}")
+        out.append(f"снять требование по длительности — тогда подойдёт {_people(relaxed['duration_hours'])}")
     if relaxed.get("event_format"):
         out.append(
-            f"рассмотреть подрядчиков, не заявивших формат «{req['event_format']}» — их {relaxed['event_format']}"
+            f"рассмотреть тех, кто не заявил формат «{req['event_format']}» явно — "
+            f"тогда подойдёт {_people(relaxed['event_format'])}"
         )
     if not out:
         out.append("ни одно одиночное послабление не помогает: кандидаты не проходят сразу по нескольким условиям")
@@ -582,18 +586,18 @@ def _month_name(month: str) -> str:
     return _MONTHS_PREPOSITIONAL.get(month[-2:], month)
 
 
-def _nearby_dates(req: dict, requested: date) -> list[dict]:
+def _nearby_dates(req: dict, requested: dt.date) -> list[dict]:
     """Ближайшие даты в окне ±14 дней, где подходящих становится больше."""
     found = []
     for delta in range(1, SHIFT_DAYS + 1):
-        for shifted in (requested + timedelta(days=delta), requested - timedelta(days=delta)):
+        for shifted in (requested + dt.timedelta(days=delta), requested - dt.timedelta(days=delta)):
             if not (WINDOW_START <= shifted <= WINDOW_END):
                 continue
             probe = dict(req, date=shifted.isoformat())
             _, passed, _ = _shortlist(probe)
             if passed:
                 found.append({"date": shifted.isoformat(), "available": len(passed)})
-    found.sort(key=lambda item: (abs((date.fromisoformat(item["date"]) - requested).days), item["date"]))
+    found.sort(key=lambda item: (abs((dt.date.fromisoformat(item["date"]) - requested).days), item["date"]))
     return found[:3]
 
 
@@ -627,7 +631,7 @@ def _season(req: dict) -> dict:
         iso = day.isoformat()
         free = sum(1 for p in pool if iso not in p["busy_dates"])
         by_month.setdefault(f"{day.year}-{day.month:02d}", []).append(free)
-        day += timedelta(days=1)
+        day += dt.timedelta(days=1)
     return {
         "total_in_category": len(pool),
         "average_free_per_month": {m: round(sum(v) / len(v), 1) for m, v in by_month.items()},
