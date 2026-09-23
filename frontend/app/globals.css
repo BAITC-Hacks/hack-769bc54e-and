@@ -26,9 +26,13 @@ h1, h2, p { margin: 0; }
 
 .shell {
   display: grid;
-  grid-template-columns: minmax(320px, 440px) minmax(0, 1fr);
+  grid-template-columns: minmax(320px, 520px) minmax(0, 1fr);
   min-height: 100vh;
 }
+
+/* Пока запуска нет, журналу показывать нечего — отдаём место форме,
+   чтобы строки CSV читались без горизонтальной прокрутки. */
+.shell-intro { grid-template-columns: minmax(320px, 780px) minmax(0, 1fr); }
 
 /* ---------- Левая колонка: постановка задачи ---------- */
 .brief {
@@ -37,7 +41,7 @@ h1, h2, p { margin: 0; }
   align-self: start;
   max-height: 100vh;
   overflow-y: auto;
-  padding: 40px 32px;
+  padding: 40px clamp(24px, 3vw, 44px);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -82,7 +86,7 @@ textarea.mono { font: 400 0.8125rem/1.6 var(--mono); white-space: pre; overflow-
   cursor: pointer;
 }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
-.btn-primary { margin-top: 14px; background: var(--ink); color: var(--surface); }
+.btn-primary { margin-top: 14px; align-self: start; background: var(--ink); color: var(--surface); }
 .btn-approve { background: var(--ink); color: var(--surface); }
 .btn-quiet { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
 

@@ -100,9 +100,10 @@ export default function Page() {
   }
 
   const focused = !!run && collapsed;
+  const shellClass = focused ? "shell shell-focused" : run ? "shell" : "shell shell-intro";
 
   return (
-    <main className={focused ? "shell shell-focused" : "shell"}>
+    <main className={shellClass}>
       <section className="brief">
         <header>
           <h1>{brand.name}</h1>
@@ -130,14 +131,14 @@ export default function Page() {
         <label htmlFor="task">{brand.taskLabel}</label>
         <textarea
           id="task"
-          rows={2}
+          rows={3}
           value={task}
           onChange={(e) => setTask(e.target.value)}
           placeholder={brand.taskPlaceholder}
         />
 
         <label htmlFor="input">{brand.inputLabel}</label>
-        <textarea id="input" className="mono" rows={10} value={input} onChange={(e) => setInput(e.target.value)} spellCheck={false} />
+        <textarea id="input" className="mono" rows={16} value={input} onChange={(e) => setInput(e.target.value)} spellCheck={false} />
 
         <button className="btn btn-primary" onClick={start} disabled={busy || !task.trim() || !!active}>
           {busy ? brand.startingButton : brand.startButton}
