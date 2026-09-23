@@ -111,7 +111,7 @@ SAMPLES = [
     {
         "id": "dense",
         "label": "Ведущий на свадьбу, 15 октября",
-        "task": "Нужен ведущий на свадьбу в Алматы 15 октября 2026, бюджет 900000 тенге.",
+        "task": "Нужен ведущий на свадьбу в Алматы 15 октября 2026, бюджет 1000000 тенге.",
         "input": "",
     },
     # Требование 9: площадка — такой же запрос, только категория другая
@@ -300,9 +300,15 @@ _SENTENCE_SPLIT = re.compile(r'(?<=[.!?])[»"\']*\s+|[\n•·]+')
 _GREETING = re.compile(r"^(меня зовут|приветству|здравствуй|добрый день|привет)", re.I)
 _CONTACT = re.compile(
     r"связ\w*\s+со\s+мной|телефон|whatsapp|инстаграм|instagram|заключаем договор"
-    r"|подробную информацию|пишите|звоните|директ|по\s+ссылке",
+    r"|подробную информацию|пишите|звоните|директ|по\s+ссылке|@",
     re.I,
 )
+
+
+def _shouting(sentence: str) -> bool:
+    """Фраза набрана капсом: доказательство из неё кричит, а не убеждает."""
+    letters = [c for c in sentence if c.isalpha()]
+    return bool(letters) and sum(c.isupper() for c in letters) / len(letters) > 0.3
 
 
 def _sentences(text: str) -> list[str]:
@@ -343,8 +349,10 @@ def _quote(description: str, signal: set[str], fallback: set[str] | None = None)
             overlap = len(stems & fallback)
         # Порядок важности: попадание в пожелания, затем целая фраза без обрезки,
         # затем конкретика в цифрах — годы опыта и количество мероприятий.
+        # Капс проигрывает обычной фразе, но описание целиком капсом без цитаты не остаётся
         key = (
             overlap,
+            not _shouting(sentence),
             len(sentence) <= QUOTE_MAX_CHARS,
             any(c.isdigit() for c in sentence),
             -index,
@@ -359,7 +367,9 @@ def _quote(description: str, signal: set[str], fallback: set[str] | None = None)
         quote = quote[:QUOTE_MAX_CHARS].rsplit(" ", 1)[0]
     if quote not in description:
         return None
-    return quote
+    # Хвост после «Меня зовут X —» начинается со строчной. Первая буква поднимается,
+    # остальное дословно: это единственное отступление от точной подстроки.
+    return quote[0].upper() + quote[1:] if quote[:1].islower() else quote
 
 
 def _reasons(profile: dict, req: dict) -> list[dict]:
@@ -609,7 +619,7 @@ def _search_schema() -> dict:
                 "enum": vocab["event_formats"],
                 "description": "Event format from the catalog",
             },
-            "budget_kzt": {"type": "integer", "description": "Budget ceiling per contractor, KZT"},
+            "budget_kzt": {"type": "integer", "minimum": 1, "description": "Budget ceiling per contractor, KZT"},
             "duration_hours": {"type": "integer", "description": "Optional. Hours on site"},
             "language": {
                 "type": "string",

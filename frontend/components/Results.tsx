@@ -3,7 +3,7 @@
 import ReactMarkdown from "react-markdown";
 import { DATE_COMPARISON, HONESTY_TEXT, OUTCOME, REJECT_REASONS, RESULTS } from "@/lib/brand";
 import {
-  capitalize, explanations, factsLine, findSearchResult, kzt, outcomeKind, parseItems,
+  capitalize, explanations, factsLine, findSearchResult, kzt, maskName, outcomeKind, parseItems,
   reasonCounts,
 } from "@/lib/results";
 import type { ContractorCard, Run, SearchResult } from "@/lib/types";
@@ -59,17 +59,17 @@ function Card({
       {different && <span className="difference-badge">{DATE_COMPARISON.onlyOnThisDate}</span>}
       {text ? (
         <div className="card-why">
-          <ReactMarkdown>{text}</ReactMarkdown>
+          <ReactMarkdown>{hideIdentity ? maskName(text, card.name) : text}</ReactMarkdown>
         </div>
       ) : writing ? (
         <p className="card-why card-pending">{RESULTS.writing}</p>
       ) : (
         <div className="card-why">
-          <p>{factsLine(card)}</p>
+          <p>{hideIdentity ? maskName(factsLine(card), card.name) : factsLine(card)}</p>
           <p className="card-note">{RESULTS.factsNote}</p>
         </div>
       )}
-      {card.match.quote && (
+      {card.match.quote && !hideIdentity && (
         <figure className="card-quote">
           <figcaption>{RESULTS.quoteLabel}</figcaption>
           <blockquote>«{card.match.quote}»</blockquote>
@@ -93,9 +93,9 @@ function Outcome({ found }: { found: SearchResult }) {
     : kind === "none" ? OUTCOME.none.title(total)
     : noCategory && found.note ? capitalize(found.note)
     : OUTCOME.absent.unknownTitle;
+  // Для полной и неполной выдачи итог уже в заголовке и в строке занятости; вторую цифру не дублируем
   const sub =
-    kind === "full" || kind === "partial" ? OUTCOME.passed(passed, total)
-    : kind === "none" || noCategory ? null
+    kind === "full" || kind === "partial" || kind === "none" || noCategory ? null
     : found.note ?? null;
 
   return (

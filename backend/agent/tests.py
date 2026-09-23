@@ -289,7 +289,19 @@ class ContractorDomainTests(TestCase):
         for profile in self.m.catalog():  # W5 / A16: includes uppercase and mid-sentence quotes.
             quote = self.m._quote(profile["description"], set(), fallback={"ведущ"})
             if quote is not None:
-                self.assertIn(quote, profile["description"], profile["id"])
+                # Единственное допустимое отличие — поднятая первая буква у фрагмента из середины фразы
+                lowered = quote[0].lower() + quote[1:]
+                self.assertTrue(quote in profile["description"] or lowered in profile["description"], profile["id"])
+                self.assertIn(quote[1:], profile["description"], profile["id"])
+
+    def test_quote_never_carries_handles_and_prefers_normal_case(self):
+        for profile in self.m.catalog():
+            quote = self.m._quote(profile["description"], set(), fallback={"ведущ"})
+            if quote:
+                self.assertNotIn("@", quote, profile["id"])
+                if self.m._shouting(quote):
+                    # Капс допустим только когда в описании нет ни одной обычной фразы
+                    self.assertTrue(all(self.m._shouting(s) for s in self.m._sentences(profile["description"])), profile["id"])
 
     def test_words_echoed_from_the_request_are_not_counted_as_a_match(self):
         card = self.search(date="2026-10-15", free_text="ведущий на свадьбу в Алматы")["cards"][0]

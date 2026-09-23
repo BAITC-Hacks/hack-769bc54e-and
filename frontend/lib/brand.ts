@@ -102,6 +102,8 @@ export const RESULTS = {
   knownValues: "В каталоге есть:",
   quoteLabel: "Из описания подрядчика",
   modelText: "Текст ответа модели",
+  journalTitle: (steps: number) => `Как получен результат — ${steps} ${steps === 1 ? "шаг" : steps < 5 ? "шага" : "шагов"} агента`,
+  journalHint: "Модель сама вызвала инструмент поиска, код отфильтровал и отранжировал, модель написала объяснения по фактам.",
   searching: "Разбираю запрос и ищу по каталогу…",
   failedTitle: "Подбор не состоялся",
   failedHint: "Что пошло не так — в журнале ниже.",
@@ -124,7 +126,8 @@ export const RESULTS = {
 export const OUTCOME = {
   full: {
     badge: "Полная выдача",
-    title: (shown: number, passed: number) => `${shown} лучших из ${passed} подходящих`,
+    title: (shown: number, passed: number) =>
+      passed > shown ? `Подобрали ${shown} лучших из ${passed} подходящих` : `Подобрали ${shown}, подходят все ${passed}`,
   },
   partial: {
     badge: "Меньше трёх",

@@ -1,10 +1,12 @@
 /* Токены. Меняйте здесь — поменяется весь интерфейс. */
 :root {
-  --paper: #e9edf2;
-  --surface: #f8fafc;
-  --ink: #14213d;
-  --muted: #5b6b82;
-  --line: #c5ceda;
+  --paper: #eef0ec;
+  --surface: #fbfbf9;
+  --ink: #1b2233;
+  --muted: #566274;
+  --line: #d3d8d2;
+  --accent: #1f7a6c;
+  --shadow: 0 1px 2px rgba(27, 34, 51, 0.06), 0 8px 24px -18px rgba(27, 34, 51, 0.25);
   --gate: #e8a33d;
   --gate-soft: #fdf3df;
   --threat: #b93a32;
@@ -20,6 +22,8 @@ body {
   background: var(--paper);
   color: var(--ink);
   font: 400 16px/1.55 var(--sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 h1, h2, p { margin: 0; }
@@ -64,8 +68,10 @@ textarea, input, select {
   color: var(--ink);
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 8px;
+  transition: border-color 0.15s ease;
 }
+textarea:hover, input:hover, select:hover { border-color: var(--muted); }
 textarea { resize: vertical; }
 select { cursor: pointer; }
 textarea.mono { font: 400 0.8125rem/1.6 var(--mono); white-space: pre; overflow-x: auto; }
@@ -73,10 +79,13 @@ textarea.mono { font: 400 0.8125rem/1.6 var(--mono); white-space: pre; overflow-
 .btn {
   font: 600 1rem var(--sans);
   border: 0;
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 12px 20px;
   cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.05s ease;
 }
+.btn:not(:disabled):hover { opacity: 0.88; }
+.btn:not(:disabled):active { transform: translateY(1px); }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .btn-primary { margin-top: 14px; align-self: start; background: var(--ink); color: var(--surface); }
 .btn-approve { background: var(--ink); color: var(--surface); }
@@ -143,9 +152,9 @@ textarea.mono { font: 400 0.8125rem/1.6 var(--mono); white-space: pre; overflow-
   flex-wrap: wrap;
   gap: 8px 40px;
   margin: 0 0 28px;
-  padding: 16px 20px;
-  background: var(--paper);
-  border-radius: 8px;
+  padding: 14px 20px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
   width: fit-content;
 }
 .summary div { display: flex; flex-direction: column; gap: 2px; }
@@ -159,6 +168,12 @@ textarea.mono { font: 400 0.8125rem/1.6 var(--mono); white-space: pre; overflow-
 }
 
 /* Журнал — вертикальная нить с узлами. Узел = одно решение или действие агента. */
+.journal-wrap { max-width: 78ch; margin-top: 8px; padding-top: 18px; border-top: 1px solid var(--line); }
+.journal-wrap > summary { display: flex; flex-direction: column; gap: 2px; width: auto; color: var(--ink); }
+.journal-wrap > summary::marker { color: var(--muted); }
+.journal-title { font-weight: 600; font-size: 1rem; }
+.journal-hint { font-size: 0.875rem; color: var(--muted); }
+.journal-wrap[open] > summary { margin-bottom: 18px; }
 .journal { list-style: none; margin: 0; padding: 0; max-width: 78ch; }
 
 .step {
@@ -259,18 +274,23 @@ details[open] summary { margin-bottom: 8px; }
 /* ---------- Карточки подбора ---------- */
 .results { max-width: 78ch; margin-bottom: 36px; }
 .results-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.results h2 { font-size: 1.375rem; letter-spacing: -0.01em; }
+.results h2 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; }
+
+/* Экран результата — то, что видит жюри с проектора: кегль выше базового */
+.shell-focused { font-size: 17.5px; }
 .results-actions { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: flex-end; gap: 6px 14px; }
 .response-time { color: var(--muted); font-size: 0.875rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* Исход подбора. Цвет, метка и заголовок различают четыре вида ответа до чтения карточек (R12). */
 .outcome {
   --tone: var(--muted);
-  margin: 10px 0 14px;
-  padding: 14px 18px;
-  border-left: 6px solid var(--tone);
-  border-radius: 0 8px 8px 0;
-  background: color-mix(in srgb, var(--tone) 9%, var(--surface));
+  margin: 12px 0 18px;
+  padding: 14px 18px 14px 20px;
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--tone);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
 }
 .outcome-full { --tone: var(--clear); }
 .outcome-partial { --tone: var(--gate); }
@@ -289,7 +309,7 @@ details[open] summary { margin-bottom: 8px; }
   border-radius: 4px;
 }
 .outcome-partial .outcome-badge { color: var(--ink); }
-.outcome-title { margin-top: 6px; font-size: 1.1875rem; font-weight: 700; }
+.outcome-title { margin-top: 6px; font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em; }
 .outcome-sub { margin-top: 2px; color: var(--muted); font-size: 0.9375rem; font-variant-numeric: tabular-nums; }
 .outcome-warning { margin-top: 8px; font-size: 0.9375rem; font-weight: 500; color: #9a6408; }
 /* Занятость категории на дату: то, что отличает две даты даже при одинаковых карточках */
@@ -300,9 +320,11 @@ details[open] summary { margin-bottom: 8px; }
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 16px 28px;
-  padding: 16px 20px;
-  background: var(--paper);
-  border-radius: 8px;
+  padding: 18px 22px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
 }
 .diagnosis h3 { font-size: 0.8125rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 6px; }
 .diagnosis-headline { margin: 0 0 8px; font-size: 0.9375rem; font-variant-numeric: tabular-nums; }
@@ -314,33 +336,48 @@ details[open] summary { margin-bottom: 8px; }
 .cards { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 12px; counter-reset: card; }
 .card {
   counter-increment: card;
-  padding: 18px 20px;
+  padding: 20px 22px 18px;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-left: 4px solid var(--clear);
-  border-radius: 8px;
+  border-radius: 10px;
+  box-shadow: var(--shadow);
 }
+.cards { gap: 14px; }
 .card-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; }
-.card-name { margin: 0; font-size: 1.1875rem; font-weight: 700; }
-.card-name::before { content: counter(card) ". "; color: var(--muted); font-weight: 500; }
+.card-name { margin: 0; font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em; }
+.card-name::before {
+  content: counter(card);
+  display: inline-grid;
+  place-items: center;
+  width: 1.6em;
+  height: 1.6em;
+  margin-right: 10px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--surface);
+  font-size: 0.75rem;
+  font-weight: 600;
+  vertical-align: 0.15em;
+}
+.card-identity-hidden .card-name::before { background: var(--muted); }
 .card-identity-hidden .card-name { color: var(--muted); font-weight: 600; }
-.card-price { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.card-price { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--accent); }
 .card-meta { margin-top: 2px; color: var(--muted); font-size: 0.875rem; }
 .card .honesty-badges { margin-top: 9px; }
-.card-why { margin-top: 10px; max-width: 68ch; }
+.card-why { margin-top: 12px; max-width: 68ch; font-size: 1.0625em; line-height: 1.6; }
 .card-why p + p { margin-top: 4px; }
 .card-pending { color: var(--muted); animation: pulse 1.4s ease-in-out infinite; }
 .card-note { font-size: 0.8125rem; color: var(--muted); }
-.card-quote { margin: 12px 0 0; padding: 8px 0 8px 14px; border-left: 2px solid var(--line); }
+.card-quote { margin: 14px 0 0; padding: 10px 14px; border-left: 3px solid var(--accent); background: var(--paper); border-radius: 0 8px 8px 0; }
 .card-quote figcaption { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
-.card-quote blockquote { margin: 2px 0 0; font-size: 0.9375rem; font-style: italic; }
+.card-quote blockquote { margin: 3px 0 0; font-size: 0.9375rem; font-style: italic; color: var(--ink); }
 
 .rejected {
   margin: 0 0 14px;
-  padding: 12px 16px;
+  padding: 12px 18px;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--paper);
+  border-radius: 10px;
+  background: var(--surface);
 }
 .rejected summary { cursor: pointer; font-weight: 600; }
 .rejected > ol { margin: 12px 0 0; padding-left: 22px; max-height: 24rem; overflow-y: auto; }

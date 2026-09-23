@@ -58,7 +58,14 @@ export function Journal({ run, deciding, onDecide }: Props) {
   const last = run.steps[run.steps.length - 1];
   const waiting = run.status === "awaiting_approval" && last?.kind === "tool_call";
 
+  // Пока агент работает, журнал раскрыт: видно, что происходит. Готовый результат читают по карточкам,
+  // а ход — по запросу (требование DoD «команда может объяснить, что внутри пайплайна»).
   return (
+    <details className="journal-wrap" open={run.status !== "done"}>
+      <summary>
+        <span className="journal-title">{RESULTS.journalTitle(run.steps.length)}</span>
+        <span className="journal-hint">{RESULTS.journalHint}</span>
+      </summary>
     <ol className="journal" aria-live="polite">
       {run.steps.map((step) => {
         const isGate = waiting && step.id === last.id;
@@ -98,5 +105,6 @@ export function Journal({ run, deciding, onDecide }: Props) {
         </li>
       )}
     </ol>
+    </details>
   );
 }

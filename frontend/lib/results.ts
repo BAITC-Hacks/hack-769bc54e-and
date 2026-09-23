@@ -128,3 +128,18 @@ export function reasonCounts(found: SearchResult): [RejectReason, number][] {
 }
 
 export const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * Режим «Скрыть имена»: имя подрядчика встречается и в тексте модели, и в цитате из его
+ * описания («Кики входит в топ-10 ведущих…»). Без маскировки кнопка скрывает только заголовок,
+ * а проверка жюри «сотрите имена и попробуйте перепутать» теряет смысл.
+ */
+export function maskName(text: string, name: string): string {
+  const tokens = [name, ...name.split(/\s+/).filter((t) => t.length >= 3)];
+  return tokens.reduce(
+    (acc, token) => acc.replace(new RegExp(`${escapeRegExp(token)}(?=[^\\p{L}]|$)`, "giu"), "…"),
+    text,
+  );
+}
