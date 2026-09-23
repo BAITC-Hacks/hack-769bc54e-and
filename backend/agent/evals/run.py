@@ -158,6 +158,19 @@ def check_explanations(case: dict, run) -> list[str]:
     return problems
 
 
+_FIELD_NAMES = (
+    "availability_note", "shared_words", "standouts", "diagnosis", "suggestions",
+    "season_note", "headline", "match.", "free_text", "in_city_and_category",
+    "passed_filters", "known_values", "blocked_by", "if_relaxed",
+)
+
+
+def check_no_field_names(run) -> list[str]:
+    """Имена полей — язык машины. В ответе человеку их быть не должно."""
+    report = (run.final_report or "").lower()
+    return [f"в отчёте имя поля «{name}»" for name in _FIELD_NAMES if name in report]
+
+
 def check_quotes_are_real(run) -> list[str]:
     """Всё, что подано в кавычках, обязано быть в ответе инструмента.
 
@@ -227,6 +240,7 @@ def main() -> int:
         problems += check_compare(case, run)
         problems += check_explanations(case, run)
         problems += check_quotes_are_real(run)
+        problems += check_no_field_names(run)
         # Время меряем только с настоящей моделью: в mock отвечает заглушка
         if args.real and elapsed > args.max_seconds * 1.5:
             problems.append(f"{elapsed:.1f} с при ориентире {args.max_seconds:.0f}")
@@ -236,12 +250,37 @@ def main() -> int:
         rows.append((case["id"], ok, elapsed, run.llm_calls, "; ".join(problems) or "—"))
         print(("PASS " if ok else "FAIL ") + case["id"] + ("" if ok else ": " + "; ".join(problems)))
 
+    mode = f"настоящая модель `{settings.OPENAI_MODEL}`" if args.real else "mock (без ключей)"
+    command = "python scripts/dev.py eval" + (" -- --real" if args.real else "")
     md = [
-        "# Результаты прогона",
+        "# Прогон качества",
         "",
-        f"Кейсов: {len(rows)} · прошло: {passed} · точность: **{passed / len(rows) * 100:.0f}%**",
-        f"Режим: {'настоящая модель ' + settings.OPENAI_MODEL if args.real else 'mock'} · "
-        f"токенов: {tokens} · самый долгий ответ: {slowest:.1f} с при пороге {args.max_seconds:.0f} с",
+        "Отчёт собирается автоматически: `" + command + "`.",
+        "Кейсы — `backend/agent/evals/cases.contractors.json`, проверки — `backend/agent/evals/run.py`.",
+        "",
+        f"**Кейсов: {len(rows)} · прошло: {passed} · точность: {passed / len(rows) * 100:.0f}%**",
+        "",
+        f"Режим: {mode} · токенов: {tokens} · самый долгий ответ: {slowest:.1f} с",
+        f"при ориентире {args.max_seconds:.0f} с из Definition of Done.",
+        "",
+        "## Что проверяется в каждом кейсе",
+        "",
+        "| Проверка | Требование ТЗ |",
+        "|---|---|",
+        "| Названные инструменты действительно вызваны | 1–3 |",
+        "| В ответе инструмента есть обязательные данные — независимо от формулировки модели | 10, 12 |",
+        "| В тексте ответа есть нужное и нет запрещённых общих фраз | 6, 7 |",
+        "| Объяснение карточки не длиннее двух предложений | 5 |",
+        "| Карточки попарно неперепутываемы: у каждой есть свой факт | 14 (DoD) |",
+        "| Всё, поданное в кавычках, найдено в ответе инструмента | 6, 7 |",
+        "| Имена внутренних полей не попадают в текст для человека | — |",
+        "| Один запрос на две даты даёт разные ответы | 16 (DoD) |",
+        "| Время ответа | 13 (DoD) |",
+        "",
+        "Проверка порядка карточек (требование 5) живёт в тестах, а не здесь: она не",
+        "зависит от модели и гоняется на каждом `python scripts/dev.py check`.",
+        "",
+        "## Результаты",
         "",
         "| Кейс | Результат | Время | Вызовов модели | Замечания |",
         "|---|---|---|---|---|",
@@ -249,6 +288,21 @@ def main() -> int:
             f"| {i} | {'✅' if ok else '❌'} | {sec:.1f} с{' ⚠' if sec > args.max_seconds else ''} | {calls} | {note} |"
             for i, ok, sec, calls, note in rows
         ],
+        "",
+        "## Как читать время",
+        "",
+        "Это один замер на кейс, поэтому он шумит из-за сети: медиана того же запроса",
+        "держится около 4 секунд, отдельные прогоны доходили до 10.5. Ориентир из ТЗ",
+        f"({args.max_seconds:.0f} с) показывается всегда и помечается ⚠ при превышении,",
+        "а кейс валится только при систематическом превышении в полтора раза.",
+        "",
+        "## Чего этот прогон не проверяет",
+        "",
+        "- Красоту формулировок: различимость проверяется механически, по наличию",
+        "  собственных фактов, а не по стилю.",
+        "- Вёрстку карточек: прогон работает с ответом агента, не с интерфейсом.",
+        "- Полноту каталога: 66 профилей взяты как есть, своих записей не добавляли.",
+        "",
     ]
     Path(args.out).write_text("\n".join(md) + "\n", encoding="utf-8")
     print(f"\n{passed}/{len(rows)} · отчёт: {args.out}")

@@ -265,7 +265,8 @@ class ContractorDomainTests(TestCase):
             if quote is None:
                 continue
             profile = next(p for p in self.m.catalog() if p["id"] == card["id"])
-            self.assertIn(quote.rstrip("."), profile["description"])
+            # Первая буква могла быть поднята в верхний регистр: фрагмент вырван из середины
+            self.assertIn(quote.rstrip(".").lower(), profile["description"].lower())
 
     def test_words_echoed_from_the_request_are_not_counted_as_a_match(self):
         card = self.search(date="2026-10-15", free_text="ведущий на свадьбу в Алматы")["cards"][0]
@@ -417,3 +418,46 @@ class ContractorDomainTests(TestCase):
             [c["id"] for c in with_paraphrase["cards"]],
             [c["id"] for c in without["cards"]],
         )
+
+    def test_every_card_gets_a_lead_fact_nobody_else_has(self):
+        for kw in ({"date": "2026-10-15"}, {"date": "2026-10-15", "language": "казахский"}):
+            cards = self.search(**kw)["cards"]
+            leads = [c["match"]["lead"] for c in cards]
+            self.assertEqual(len(leads), len(set(leads)), f"{kw}: одинаковые выделения {leads}")
+            self.assertTrue(all(leads))
+
+    def test_service_words_of_the_request_do_not_change_the_order(self):
+        plain = tools.RunContext(run_id="t", input_text="",
+                                 task="Нужен ведущий на свадьбу в Алматы 15 октября 2026, бюджет 900000")
+        wordy = tools.RunContext(run_id="t", input_text="",
+                                 task="Подбери ведущего на свадьбу в Алматы 15 октября 2026, "
+                                      "бюджет 900000 тенге, формат классический")
+        order = []
+        for ctx in (plain, wordy):
+            r = self.m.search_contractors(ctx, city="Алматы", category="Ведущий", date="2026-10-15",
+                                          event_format="свадьба", budget_kzt=900000)
+            order.append([c["id"] for c in r["cards"]])
+        self.assertEqual(order[0], order[1])
+
+    def test_contact_boilerplate_is_dropped_anywhere_in_the_sentence(self):
+        for profile in self.m.catalog():
+            quote = self.m._quote(profile["description"], set())
+            if quote:
+                low = quote.lower()
+                self.assertNotIn("whatsapp", low)
+                self.assertNotIn("пишите", low)
+                self.assertNotIn("телефон", low)
+
+    def test_offline_report_explains_every_card_without_a_model(self):
+        r = self.search(date="2026-10-15")
+        text = self.m.offline_report({"search_contractors": r})
+        for card in r["cards"]:
+            self.assertIn(card["name"], text)
+            self.assertIn(card["match"]["lead"], text)
+        self.assertNotIn("```", text)  # это ответ, а не выгрузка JSON
+
+    def test_offline_report_explains_an_empty_result_in_words(self):
+        r = self.search(category="Отель", date="2026-12-26", budget_kzt=3000000)
+        text = self.m.offline_report({"search_contractors": r})
+        self.assertIn("не нашлось", text)
+        self.assertIn("в каталоге 2", text)

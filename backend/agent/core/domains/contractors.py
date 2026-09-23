@@ -55,13 +55,16 @@ How to work here:
 # Карточки рисует интерфейс из результата search_contractors — от модели нужны только тексты
 # объяснений в том же порядке. Нумерованный список одинаково читается и в разметке, и в коде.
 REPORT_FORMAT = """\
-Write the answer in Russian, in Markdown, in exactly this shape and nothing else:
+Write the answer in Russian, in Markdown, in exactly this shape and nothing else.
+Never write the name of a data field in the answer: words like availability_note, match,
+quote, standouts, lead, diagnosis, suggestions belong to the machine, not to the reader.
 
-1. One opening line: how many contractors were found and for which request. Do not put the
-   request in «...»: guillemets are reserved for literal fragments of a contractor's
-   description, and quoting anything else makes the evidence unverifiable. End the line with
-   `availability_note` as it is — the reader must see how many of the category are booked
-   on that exact date, otherwise two different dates look the same.
+1. One opening line: how many contractors were found and for which request, and then the
+   sentence stored in the availability field — write that sentence out, never the name of
+   the field. The reader must see how many of the category are booked on that exact date,
+   otherwise two different dates look identical.
+   Do not put the request in «...»: guillemets are reserved for literal fragments of a
+   contractor's description, and quoting anything else makes the evidence unverifiable.
 2. A numbered list, one item per returned card, in the order the catalog returned them.
    Each item: `**Имя** — one or two sentences of explanation.` Two sentences maximum:
    a third one means the card no longer fits the format the task asks for. A quoted fragment
@@ -69,7 +72,7 @@ Write the answer in Russian, in Markdown, in exactly this shape and nothing else
 3. If there are fewer than three cards, a closing block: first `diagnosis.headline`
    reproduced as it is — it already lists exactly which conditions blocked how many, and
    listing conditions that did not occur is a defect — then **every** line of
-   `diagnosis.suggestions`, each as its own bullet, reproduced word for word. Not a summary
+   the suggestions list, each as its own bullet, reproduced word for word. Not a summary
    of them, not a selection — all of them. They already contain the right numbers, dates and
    city names; inventing your own is a defect. When `diagnosis.season_note` is present, add it
    after the bullets: a thin month is the season, not a failure.
@@ -91,11 +94,10 @@ Rules for the explanations:
   fields such as `match` or `quote` in the answer.
 - The cards must stay distinguishable with the names removed. Two explanations that would fit
   each other equally well are a defect.
-- `match.standouts` says what sets this contractor apart from the others that passed —
-  cheapest of the three, the only one with English, the narrowest specialisation.
-  **When it is not empty, the explanation must OPEN with one of these facts**, before any
-  price or format. It is the answer to "why this one and not the next", and without it three
-  cards read as one template with different numbers.
+- `match.lead` is the one fact that belongs to this contractor and to no other card in the
+  answer. **Every explanation must open with it**, before any price or format: it is the
+  answer to "why this one and not the next". `match.standouts` holds the rest of its unique
+  facts. Two cards opening with the same phrase is a defect.
 - Forbidden: "отличный выбор", "прекрасно подойдёт", "идеальный вариант", "профессионал своего
   дела", "качественно и в срок", "не пожалеете" and any other praise that is not a fact from
   `match`. No adjectives that the data does not support.
@@ -241,16 +243,25 @@ def _parse_date(value: str) -> dt.date:
 # Фильтры и скоринг
 # --------------------------------------------------------------------------
 
+# Слова самой формулировки запроса. Если их не выбросить, «подбери ведущего, формат
+# классический» поднимает профиль со словом «форматы» в описании — совпадение с
+# канцеляритом запроса, а не со смыслом пожеланий.
 _STOP = {
     "и", "в", "на", "для", "с", "по", "до", "от", "не", "или", "а", "но", "мы", "наш",
-    "это", "как", "что", "все", "его", "их", "мероприятие", "мероприятия", "нужен",
-    "нужна", "нужно", "хочу", "тенге", "бюджет",
+    "это", "как", "что", "все", "его", "их", "мероприятие", "мероприятия",
+    "нужен", "нужна", "нужно", "нужны", "требуется", "хочу", "хотим", "ищу", "ищем",
+    "подбери", "подобрать", "подберите", "найди", "найти", "посоветуй", "порекомендуй",
+    "тенге", "бюджет", "бюджета", "формат", "формата", "форматы", "категория", "город",
+    "дата", "число", "часов", "часа", "человек", "гостей",
+    "января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа",
+    "сентября", "октября", "ноября", "декабря",
 }
 
 
 def _words(text: str) -> set[str]:
     cleaned = "".join(c.lower() if c.isalnum() else " " for c in text)
-    return {w for w in cleaned.split() if len(w) > 3 and w not in _STOP}
+    # Числа выбрасываем: «2026» и «900000» не несут смысла для близости описаний
+    return {w for w in cleaned.split() if len(w) > 3 and not w.isdigit() and w not in _STOP}
 
 
 def _stemmed(text: str) -> dict[str, str]:
@@ -279,13 +290,14 @@ def _noise(req: dict) -> set[str]:
 QUOTE_MAX_CHARS = 180
 
 
-_SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+|[\n•·—]+")
-# Фразы, которые формально «предложения», но доказательством не являются
-# Приветствия и контактная обвязка — формально предложения, доказательством не являются
-_WEAK_QUOTE = re.compile(
-    r"^(меня зовут|приветству|здравствуй|добрый день|привет)"
-    r"|связ\w*\s+со\s+мной|телефон|whatsapp|инстаграм|instagram|заключаем договор"
-    r"|подробную информацию|пишите|звоните",
+# Тире здесь не разделитель: «Сон Гоку — один из самых востребованных» это одна фраза,
+# а разрез по тире оставлял обрубок, начинающийся со строчной буквы.
+_SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+|[\n•·]+")
+# Приветствие узнаём по началу фразы, контактную обвязку — в любом месте
+_GREETING = re.compile(r"^(меня зовут|приветству|здравствуй|добрый день|привет)", re.I)
+_CONTACT = re.compile(
+    r"связ\w*\s+со\s+мной|телефон|whatsapp|инстаграм|instagram|заключаем договор"
+    r"|подробную информацию|пишите|звоните|директ|по\s+ссылке",
     re.I,
 )
 
@@ -299,7 +311,14 @@ def _sentences(text: str) -> list[str]:
     out = []
     for piece in _SENTENCE_SPLIT.split(text):
         piece = piece.strip(" \t-–—•·")
-        if len(piece) < 20 or _WEAK_QUOTE.match(piece):
+        if _CONTACT.search(piece):
+            continue
+        if _GREETING.match(piece):
+            # «Меня зовут X — я профессиональный ведущий и сценарист»: само представление
+            # доказательством не является, а хвост после тире вполне.
+            tail = re.split(r"\s[–—-]\s", piece, maxsplit=1)
+            piece = tail[1].strip() if len(tail) > 1 else ""
+        if len(piece) < 20:
             continue
         letters = [c for c in piece if c.isalpha()]
         if letters and sum(c.isupper() for c in letters) / len(letters) > 0.3:
@@ -308,7 +327,7 @@ def _sentences(text: str) -> list[str]:
     return out
 
 
-def _quote(description: str, signal: set[str]) -> str | None:
+def _quote(description: str, signal: set[str], fallback: set[str] | None = None) -> str | None:
     """Точный фрагмент описания как доказательство под объяснением.
 
     Выбирается детерминированно и возвращается дословно, поэтому модель физически
@@ -316,7 +335,12 @@ def _quote(description: str, signal: set[str]) -> str | None:
     """
     best, best_key = None, None
     for index, sentence in enumerate(_sentences(description)):
-        overlap = len(set(_stemmed(sentence)) & signal)
+        stems = set(_stemmed(sentence))
+        overlap = len(stems & signal)
+        # Без пожеланий ориентируемся на то, говорит ли фраза о самой услуге,
+        # иначе в цитату попадает вежливая пустота вроде «учтём все ваши пожелания»
+        if not signal and fallback:
+            overlap = len(stems & fallback)
         # Порядок важности: попадание в пожелания, затем целая фраза без обрезки,
         # затем конкретика в цифрах — годы опыта и количество мероприятий.
         key = (
@@ -333,7 +357,10 @@ def _quote(description: str, signal: set[str]) -> str | None:
     if len(quote) > QUOTE_MAX_CHARS:
         # Режем по границе слова: обрезок всё равно обязан быть дословным куском описания
         quote = quote[:QUOTE_MAX_CHARS].rsplit(" ", 1)[0]
-    return quote if quote in description else None
+    if quote not in description:
+        return None
+    # Фрагмент вырван из середины описания, поэтому может начинаться со строчной буквы
+    return quote[0].upper() + quote[1:] if quote[:1].islower() else quote
 
 
 def _reasons(profile: dict, req: dict) -> list[dict]:
@@ -382,7 +409,9 @@ def _score(profile: dict, req: dict) -> tuple[float, dict]:
     described = _stemmed(profile["description"])
     matched = sorted(described[stem] for stem in wish_stems if stem in described)
     facts["shared_words"] = matched[:5]
-    facts["quote"] = _quote(profile["description"], set(wish_stems))
+    facts["quote"] = _quote(
+        profile["description"], set(wish_stems), fallback={req["category"][:5].lower()}
+    )
     description_score = min(1.0, len(matched) / 3)
 
     # Чем уже специализация, тем точнее попадание в конкретный формат
@@ -438,6 +467,30 @@ def _standouts(profile: dict, peers: list[dict], req: dict) -> list[str]:
     if len(profile["languages"]) == max(len(p["languages"]) for p in peers) and len(profile["languages"]) > 1:
         out.append(f"больше всех языков: {', '.join(profile['languages'])}")
     return out[:3]
+
+
+def _keep_unique_standouts(facts_list: list[dict]) -> None:
+    """Оставляет каждой карточке только то, чего нет у соседей, и назначает ведущий факт.
+
+    Экстремум, общий для двоих, ничего не выделяет: две карточки по 900 000 ₸ обе
+    «самые дешёвые из двух», и объяснения начинаются одинаковой фразой. Требование 14
+    должно выполняться кодом, а не надеждой на модель.
+    """
+    seen: dict[str, int] = {}
+    for facts in facts_list:
+        for line in facts.get("standouts", []):
+            seen[line] = seen.get(line, 0) + 1
+
+    taken: set[str] = set()
+    for position, facts in enumerate(facts_list, 1):
+        unique = [line for line in facts.get("standouts", []) if seen[line] == 1 and line not in taken]
+        facts["standouts"] = unique
+        if unique:
+            taken.add(unique[0])
+            facts["lead"] = unique[0]
+        else:
+            # Уникального признака нет — честно говорим о месте в выдаче
+            facts["lead"] = f"{position}-й по совокупности условий из {len(facts_list)} подходящих"
 
 
 def _card(profile: dict, score: float, facts: dict) -> dict:
@@ -616,10 +669,11 @@ def search_contractors(
             item[2]["id"],
         )
     )
-    cards = []
-    for value, facts, profile in scored[:MAX_CARDS]:
+    top = scored[:MAX_CARDS]
+    for value, facts, profile in top:
         facts["standouts"] = _standouts(profile, passed, req)
-        cards.append(_card(profile, value, facts))
+    _keep_unique_standouts([facts for _, facts, _ in top])
+    cards = [_card(profile, value, facts) for value, facts, profile in top]
 
     busy_now = sum(1 for p in pool if req["date"] in p["busy_dates"])
     result = {
@@ -1006,3 +1060,63 @@ def plan(request: str, results: dict):
     if needs_diagnosis and "diagnose_request" not in results:
         return "Подходящих меньше трёх — разберусь, что именно помешало.", "diagnose_request", args
     return None
+
+
+def offline_report(results: dict) -> str | None:
+    """Ответ без модели, собранный из того же набора фактов.
+
+    Проверяющий без ключа должен увидеть продукт, а не выгрузку JSON: цифры, ведущий
+    факт и цитату по каждой карточке. Текст беднее, чем у модели, зато полностью
+    воспроизводим — и это ровно то, что проверяется в пункте 5.6.6 Положения.
+    """
+    found = results.get("search_contractors")
+    if not isinstance(found, dict):
+        return None
+
+    lines = []
+    cards = found.get("cards") or []
+    if cards:
+        note = found.get("availability_note") or ""
+        if note:
+            note = note[0].upper() + note[1:]
+        lines.append(f"Найдено {_people(len(cards))}. {note}".strip())
+        lines.append("")
+        for number, card in enumerate(cards, 1):
+            match = card.get("match", {})
+            budget = match.get("budget") or {}
+            bits = [match.get("lead") or ""]
+            if budget:
+                bits.append(
+                    f"цена от {_money(budget['price_from_kzt'])} при бюджете "
+                    f"{_money(budget['budget_kzt'])}, запас {budget['headroom_percent']}%"
+                )
+            formats = (match.get("format") or {}).get("accepts") or []
+            if formats:
+                bits.append("берёт: " + ", ".join(formats))
+            if match.get("languages"):
+                bits.append("языки: " + ", ".join(match["languages"]))
+            text = "; ".join(b for b in bits if b)
+            quote = match.get("quote")
+            if quote:
+                text += f" «{quote}»"
+            lines.append(f"{number}. **{card['name']}** — {text}")
+    else:
+        lines.append(found.get("note") or "Подходящих подрядчиков не нашлось.")
+
+    diagnosis = found.get("diagnosis") or {}
+    if diagnosis:
+        lines.append("")
+        if diagnosis.get("headline"):
+            lines.append(diagnosis["headline"])
+        for line in diagnosis.get("suggestions", []):
+            lines.append(f"- {line}")
+        if diagnosis.get("season_note"):
+            lines.append(diagnosis["season_note"])
+
+    lines.append("")
+    lines.append(
+        "_Ответ собран без модели: в `.env` не заданы `OPENAI_API_KEY` и `OPENAI_MODEL`. "
+        "Отбор, порядок и диагностика от модели не зависят и здесь настоящие — "
+        "с ключом теми же фактами объяснения формулирует LLM._"
+    )
+    return "\n".join(lines)

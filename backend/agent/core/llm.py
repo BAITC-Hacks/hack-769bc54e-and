@@ -68,9 +68,12 @@ def _mock_chat(messages):
     from . import domains
 
     raw, results = _replay(messages)
-    step = domains.active().plan(raw, results)
+    domain = domains.active()
+    step = domain.plan(raw, results)
     if step is None:
-        return {"content": _mock_report(results), "tool_calls": [], "usage": _NO_USAGE}
+        offline = getattr(domain, "offline_report", None)
+        content = (offline(results) if callable(offline) else None) or _mock_report(results)
+        return {"content": content, "tool_calls": [], "usage": _NO_USAGE}
     comment, name, arguments = step
     return {
         "content": comment,
