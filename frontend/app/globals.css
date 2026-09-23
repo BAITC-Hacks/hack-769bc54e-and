@@ -257,6 +257,7 @@ details[open] summary { margin-bottom: 8px; }
 
 /* ---------- Карточки подбора ---------- */
 .results { max-width: 78ch; margin-bottom: 36px; }
+.results-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .results h2 { font-size: 1.375rem; letter-spacing: -0.01em; }
 
 /* Исход подбора. Цвет, метка и заголовок различают четыре вида ответа до чтения карточек (R12). */
@@ -316,6 +317,7 @@ details[open] summary { margin-bottom: 8px; }
 .card-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; }
 .card-name { margin: 0; font-size: 1.1875rem; font-weight: 700; }
 .card-name::before { content: counter(card) ". "; color: var(--muted); font-weight: 500; }
+.card-identity-hidden .card-name { color: var(--muted); font-weight: 600; }
 .card-price { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .card-meta { margin-top: 2px; color: var(--muted); font-size: 0.875rem; }
 .card .honesty-badges { margin-top: 9px; }

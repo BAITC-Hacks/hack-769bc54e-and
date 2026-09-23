@@ -61,6 +61,7 @@ export default function Page() {
   const [busy, setBusy] = useState(false);
   const [deciding, setDeciding] = useState(false);
   const [error, setError] = useState("");
+  const [identitiesHidden, setIdentitiesHidden] = useState(false);
   // После запуска форма уезжает: на проекторе журнал должен занимать весь экран
   const [collapsed, setCollapsed] = useState(false);
 
@@ -255,7 +256,12 @@ export default function Page() {
               )}
             </div>
             {run.status === "done" && <Summary run={run} />}
-            <Results run={run} mock={!!health?.mock} />
+            <Results
+              run={run}
+              mock={!!health?.mock}
+              identitiesHidden={identitiesHidden}
+              onToggleIdentities={() => setIdentitiesHidden((hidden) => !hidden)}
+            />
             <Journal run={run} deciding={deciding} onDecide={decide} />
           </>
         ) : (

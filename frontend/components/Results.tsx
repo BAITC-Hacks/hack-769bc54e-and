@@ -20,18 +20,28 @@ function HonestyBadges({ card }: { card: ContractorCard }) {
   );
 }
 
-function Card({ card, text, writing }: { card: ContractorCard; text: string | null; writing: boolean }) {
+function Card({
+  card,
+  text,
+  writing,
+  hideIdentity,
+}: {
+  card: ContractorCard;
+  text: string | null;
+  writing: boolean;
+  hideIdentity: boolean;
+}) {
   return (
-    <li className="card">
+    <li className={`card${hideIdentity ? " card-identity-hidden" : ""}`}>
       <div className="card-head">
-        <h3 className="card-name">{card.name}</h3>
-        <span className="card-price">
-          {card.price_from_kzt === null ? RESULTS.priceUnknown : `${RESULTS.pricePrefix} ${kzt(card.price_from_kzt)}`}
-        </span>
+        <h3 className="card-name">{hideIdentity ? RESULTS.hiddenCardLabel : card.name}</h3>
+        {!hideIdentity && (
+          <span className="card-price">
+            {card.price_from_kzt === null ? RESULTS.priceUnknown : `${RESULTS.pricePrefix} ${kzt(card.price_from_kzt)}`}
+          </span>
+        )}
       </div>
-      <p className="card-meta">
-        {card.categories.join(" · ")} · {card.city}
-      </p>
+      {!hideIdentity && <p className="card-meta">{card.categories.join(" · ")} · {card.city}</p>}
       <HonestyBadges card={card} />
       {text ? (
         <div className="card-why">
@@ -131,7 +141,17 @@ function Diagnosis({ found }: { found: SearchResult }) {
  * модели, диагностика — из инструмента. Пустого экрана нет ни в одном состоянии запуска.
  * В mock-режиме ответ модели — сырой JSON, поэтому его не разбираем.
  */
-export function Results({ run, mock }: { run: Run; mock: boolean }) {
+export function Results({
+  run,
+  mock,
+  identitiesHidden,
+  onToggleIdentities,
+}: {
+  run: Run;
+  mock: boolean;
+  identitiesHidden: boolean;
+  onToggleIdentities: () => void;
+}) {
   const found = findSearchResult(run);
   if (!found) {
     if (run.status === "running")
@@ -165,12 +185,19 @@ export function Results({ run, mock }: { run: Run; mock: boolean }) {
 
   return (
     <section className="results" aria-labelledby="results-title">
-      <h2 id="results-title">{RESULTS.title}</h2>
+      <div className="results-head">
+        <h2 id="results-title">{RESULTS.title}</h2>
+        {found.cards.length > 0 && (
+          <button className="btn-link" type="button" aria-pressed={identitiesHidden} onClick={onToggleIdentities}>
+            {identitiesHidden ? RESULTS.showIdentities : RESULTS.hideIdentities}
+          </button>
+        )}
+      </div>
       <Outcome found={found} />
       {found.cards.length > 0 && (
         <ol className="cards">
           {found.cards.map((card, i) => (
-            <Card key={card.id} card={card} text={texts[i]} writing={writing} />
+            <Card key={card.id} card={card} text={texts[i]} writing={writing} hideIdentity={identitiesHidden} />
           ))}
         </ol>
       )}
