@@ -449,7 +449,8 @@ python scripts/dev.py eval      # прогон кейсов, отчёт в docs/
 `AGENTS.md` — правила разработки · `docs/POLOZHENIE.md` — Положение хакатона ·
 `docs/HOURLY.md` — почасовой журнал работы · `docs/EVAL.md` — отчёт о прогоне качества: что проверяется и результаты · `docs/TEAM_WORKFLOW.md` — как работаем втроём ·
 `docs/DEMO_CHECKLIST.md` — сценарий демонстрации · `docs/PITCH.md` — заготовка питча ·
-`docs/DATASET_NOTES.md` — что мы нашли в датасете.
+`docs/DATASET_NOTES.md` — что мы нашли в датасете ·
+[docs/W_REVIEW.md](docs/W_REVIEW.md) — проверка W1–W8 и сценарии воспроизведения.
 
 ## Критерии оценки → где это в решении
 

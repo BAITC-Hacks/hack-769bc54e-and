@@ -254,8 +254,18 @@ class ContractorDomainTests(TestCase):
         self.assertIn("warning", self.search(date="2027-03-01"))  # I6
 
     def test_cards_carry_honesty_flags(self):
-        card = self.search(date="2026-10-15")["cards"][0]
-        self.assertEqual(set(card["flags"]), {"synthetic", "price_imputed", "city_imputed"})  # R22
+        flags = ("synthetic", "price_imputed", "city_imputed")
+        observed = {key: set() for key in flags}
+        for sample in self.m.SAMPLES:
+            _, _, args = self.m.plan(sample["task"], {})
+            for card in self.m.search_contractors(self.ctx, **args)["cards"]:
+                profile = next(p for p in self.m.catalog() if p["id"] == card["id"])
+                self.assertEqual(card["flags"], {key: profile[key] for key in flags})
+                for key in flags:
+                    self.assertIs(type(card["flags"][key]), bool)
+                    observed[key].add(card["flags"][key])
+        for key in flags:
+            self.assertEqual(observed[key], {False, True}, key)  # R22 / W6
 
     def test_bad_date_returns_error_not_crash(self):
         self.assertIn("error", self.search(date="14 ноября"))
