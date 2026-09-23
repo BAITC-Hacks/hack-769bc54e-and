@@ -111,10 +111,53 @@ textarea.mono { font: 400 0.8125rem/1.6 var(--mono); white-space: pre; overflow-
   border-bottom: 1px solid var(--line);
 }
 .status strong { font-size: 1.25rem; }
+.status .tokens { margin-left: auto; font-variant-numeric: tabular-nums; opacity: 0.7; }
 .status span { color: var(--muted); }
 .status-awaiting_approval strong { color: #9a6408; }
 .status-done strong { color: var(--clear); }
 .status-failed strong { color: var(--threat); }
+
+/* Шапка журнала: имя продукта и возврат к форме. Видна только когда есть запуск. */
+.case-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+.mark { font-weight: 700; letter-spacing: -0.01em; }
+.btn-link {
+  font: 500 0.875rem var(--sans);
+  color: var(--muted);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.btn-link:hover { color: var(--ink); }
+
+/* Итог цифрами. Главный слайд питча, только в интерфейсе. */
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 40px;
+  margin: 0 0 28px;
+  padding: 16px 20px;
+  background: var(--paper);
+  border-radius: 8px;
+  width: fit-content;
+}
+.summary div { display: flex; flex-direction: column; gap: 2px; }
+.summary dt { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.summary dd {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
 
 /* Журнал — вертикальная нить с узлами. Узел = одно решение или действие агента. */
 .journal { list-style: none; margin: 0; padding: 0; max-width: 78ch; }
@@ -143,6 +186,7 @@ textarea.mono { font: 400 0.8125rem/1.6 var(--mono); white-space: pre; overflow-
 .step-error::before { background: var(--threat); border-color: var(--threat); }
 
 .step-kind { display: block; font-size: 0.8125rem; color: var(--muted); margin-bottom: 4px; }
+.step-at { margin-left: 10px; font-variant-numeric: tabular-nums; opacity: 0.6; }
 .step-text { max-width: 68ch; }
 
 .data {
@@ -180,6 +224,11 @@ details[open] summary { margin-bottom: 8px; }
 .report pre { background: var(--paper); padding: 12px 14px; border-radius: 6px; overflow-x: auto; }
 .report pre code { background: none; padding: 0; }
 
+/* Запуск пошёл — форма уезжает, журнал занимает весь экран. */
+.shell-focused { grid-template-columns: minmax(0, 1fr); }
+.shell-focused .brief { display: none; }
+.shell-focused .case { border-left: 0; }
+
 @media (max-width: 860px) {
   .shell { grid-template-columns: 1fr; }
   .brief { position: static; max-height: none; padding: 28px 20px; }
@@ -189,10 +238,4 @@ details[open] summary { margin-bottom: 8px; }
 
 @media (prefers-reduced-motion: reduce) {
   .step-pending .step-kind { animation: none; }
-}
-
-.status .tokens {
-  margin-left: auto;
-  font-variant-numeric: tabular-nums;
-  opacity: 0.7;
 }

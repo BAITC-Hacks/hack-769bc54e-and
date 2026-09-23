@@ -18,6 +18,15 @@ export const brand = {
   emptyTitle: "Журнал пока пуст",
   emptyHint:
     "Выберите пример слева или вставьте свой материал. Здесь появится каждый шаг агента: что он решил, какой инструмент вызвал и что получил.",
+  editRequest: "Изменить запрос",
+  hidePanel: "Свернуть панель",
+} as const;
+
+/** Подписи полоски итогов. Цифры под ними — главный аргумент в питче. */
+export const SUMMARY_LABELS = {
+  time: "Время",
+  tools: "Инструментов",
+  tokens: "Токенов",
 } as const;
 
 export const STATUS_TEXT: Record<RunStatus, string> = {

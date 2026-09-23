@@ -3,8 +3,32 @@
 import { useEffect, useState } from "react";
 import { Journal } from "@/components/Journal";
 import { api } from "@/lib/api";
-import { STATUS_TEXT, brand } from "@/lib/brand";
+import { SUMMARY_LABELS, STATUS_TEXT, brand } from "@/lib/brand";
 import type { Health, Run, Sample } from "@/lib/types";
+
+/** Итог запуска цифрами. Это то, что называют в питче: «столько-то вместо столько-то». */
+function Summary({ run }: { run: Run }) {
+  const last = run.steps[run.steps.length - 1];
+  if (!last) return null;
+  const seconds = (new Date(last.at).getTime() - new Date(run.created_at).getTime()) / 1000;
+  const tokens = run.tokens.prompt + run.tokens.completion;
+  const cells: [string, string][] = [
+    [SUMMARY_LABELS.time, `${seconds.toFixed(1)} с`],
+    [SUMMARY_LABELS.tools, String(run.steps.filter((s) => s.kind === "tool_call").length)],
+  ];
+  if (tokens > 0) cells.push([SUMMARY_LABELS.tokens, tokens.toLocaleString("ru-RU")]);
+
+  return (
+    <dl className="summary">
+      {cells.map(([label, value]) => (
+        <div key={label}>
+          <dt>{label}</dt>
+          <dd>{value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
 
 export default function Page() {
   const [task, setTask] = useState("");
@@ -15,6 +39,8 @@ export default function Page() {
   const [busy, setBusy] = useState(false);
   const [deciding, setDeciding] = useState(false);
   const [error, setError] = useState("");
+  // После запуска форма уезжает: на проекторе журнал должен занимать весь экран
+  const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
     api.samples().then(setSamples).catch(() => undefined);
@@ -52,6 +78,7 @@ export default function Page() {
     setBusy(true);
     try {
       setRun(await api.startRun(task, input));
+      setCollapsed(true);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -72,8 +99,10 @@ export default function Page() {
     }
   }
 
+  const focused = !!run && collapsed;
+
   return (
-    <main className="shell">
+    <main className={focused ? "shell shell-focused" : "shell"}>
       <section className="brief">
         <header>
           <h1>{brand.name}</h1>
@@ -127,6 +156,12 @@ export default function Page() {
       <section className="case" aria-label="Журнал работы агента">
         {run ? (
           <>
+            <div className="case-top">
+              <span className="mark">{brand.name}</span>
+              <button className="btn-link" onClick={() => setCollapsed((c) => !c)}>
+                {collapsed ? brand.editRequest : brand.hidePanel}
+              </button>
+            </div>
             <div className={`status status-${run.status}`}>
               <strong>{STATUS_TEXT[run.status]}</strong>
               <span>{run.task}</span>
@@ -136,6 +171,7 @@ export default function Page() {
                 </span>
               )}
             </div>
+            {run.status === "done" && <Summary run={run} />}
             <Journal run={run} deciding={deciding} onDecide={decide} />
           </>
         ) : (

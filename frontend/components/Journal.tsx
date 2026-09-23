@@ -16,6 +16,12 @@ function pretty(value: unknown) {
   return JSON.stringify(value, null, 2);
 }
 
+/** Секунды от начала запуска: видно, где агент думал, а где ждал человека. */
+function offset(step: Step, startedAt: string) {
+  const seconds = (new Date(step.at).getTime() - new Date(startedAt).getTime()) / 1000;
+  return seconds >= 0 && Number.isFinite(seconds) ? `+${seconds.toFixed(1)} с` : "";
+}
+
 function StepBody({ step }: { step: Step }) {
   const c = step.content;
   if (step.kind === "thought") return <p className="step-text">{String(c.text ?? "")}</p>;
@@ -53,7 +59,12 @@ export function Journal({ run, deciding, onDecide }: Props) {
         const isGate = waiting && step.id === last.id;
         return (
           <li key={step.id} className={`step step-${step.kind}${isGate ? " step-gate" : ""}`}>
-            <span className="step-kind">{KIND_LABEL[step.kind]}</span>
+            <span className="step-kind">
+              {KIND_LABEL[step.kind]}
+              <time className="step-at" dateTime={step.at}>
+                {offset(step, run.created_at)}
+              </time>
+            </span>
             <StepBody step={step} />
             {isGate && (
               <div className="gate">
