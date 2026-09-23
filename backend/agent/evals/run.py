@@ -17,6 +17,11 @@
         "contains": ["подстрока", ...],     // что обязано быть в отчёте
         "absent": ["подстрока", ...],       // чего в отчёте быть не должно
         "approval": true                     // обязан ли остановиться на подтверждении
+      },
+      "compare": {                           // необязательно: второй запрос для сравнения
+        "task": "тот же запрос с другой датой",
+        "must_differ": true,                 // ответы обязаны отличаться
+        "contains": ["подстрока", ...]       // что обязано быть во втором ответе
       }
     }
 """
@@ -59,6 +64,36 @@ def check(case: dict, run) -> tuple[bool, list[str]]:
     return not problems, problems
 
 
+def run_case(task: str, material: str, approve: bool):
+    from agent.core import loop
+
+    run = loop.create_run(task, material)
+    for _ in range(3):  # подтверждаем запросы агента, пока он не закончит
+        loop.advance(run.id)
+        run.refresh_from_db()
+        if run.status != "awaiting_approval":
+            break
+        loop.decide(run.id, approve=approve)
+    return run
+
+
+def check_compare(case: dict, run) -> list[str]:
+    """Требование 16 ТЗ: тот же запрос на другую дату даёт другой ответ."""
+    spec = case.get("compare")
+    if not spec:
+        return []
+    other = run_case(spec["task"], spec.get("input", ""), case.get("approve", True))
+    problems = []
+    if spec.get("must_differ", True) and (other.final_report or "") == (run.final_report or ""):
+        problems.append("ответ на вторую дату совпал с первым")
+    for needle in spec.get("contains", []):
+        if needle.lower() not in (other.final_report or "").lower():
+            problems.append(f"во втором ответе нет «{needle}»")
+    if other.status != "done":
+        problems.append(f"второй запуск: статус {other.status}")
+    return problems
+
+
 def load_cases(limit: int | None) -> list[dict]:
     """Кейсы активного домена: cases.<домен>.json, иначе общий cases.json."""
     from django.conf import settings
@@ -97,14 +132,10 @@ def main() -> int:
 
     rows, passed, tokens = [], 0, 0
     for case in cases:
-        run = loop.create_run(case["task"], case.get("input", ""))
-        for _ in range(3):  # подтверждаем запросы агента, пока он не закончит
-            loop.advance(run.id)
-            run.refresh_from_db()
-            if run.status != "awaiting_approval":
-                break
-            loop.decide(run.id, approve=case.get("approve", True))
+        run = run_case(case["task"], case.get("input", ""), case.get("approve", True))
         ok, problems = check(case, run)
+        problems += check_compare(case, run)
+        ok = not problems
         passed += ok
         tokens += run.prompt_tokens + run.completion_tokens
         rows.append((case["id"], ok, run.llm_calls, "; ".join(problems) or "—"))

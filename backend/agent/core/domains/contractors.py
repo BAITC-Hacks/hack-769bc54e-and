@@ -59,9 +59,9 @@ Write the answer in Russian, in Markdown, in exactly this shape and nothing else
 2. A numbered list, one item per returned card, in the order the catalog returned them.
    Each item: `**Имя** — one or two sentences of explanation.`
 3. If there are fewer than three cards, one closing line saying how many there are and why,
-   based on diagnose_request: which condition blocked whom and what single change would help
-   (another date, a higher budget, dropping the language or duration requirement).
-   If no single change helps, say so plainly.
+   based on diagnose_request: which condition blocked whom, and then the ready-made wording
+   from `suggestions` — use it as it is, do not invent your own numbers or dates.
+   When `season_note` is present, add it: a thin month is the season, not a failure.
 
 Rules for the explanations:
 - Build every sentence on the numbers and facts in `match`: budget headroom in percent,
@@ -449,18 +449,30 @@ def diagnose_request(
 
     pool, passed, rejected = _shortlist(req)
     if not pool:
-        alt = sorted({p["city"] for p in catalog() if req["category"] in p["categories"]})
+        elsewhere = {}
+        for p in catalog():
+            if req["category"] in p["categories"] and p["city"] != req["city"]:
+                elsewhere[p["city"]] = elsewhere.get(p["city"], 0) + 1
+        where = sorted(elsewhere)
         return {
             "outcome": "no_category_in_city",
             "in_city_and_category": 0,
-            "category_available_in": alt,
+            "category_available_in": where,
             "note": f"категории «{req['category']}» в городе {req['city']} нет вообще",
+            "suggestions": [
+                f"в городе {req['city']} категории «{req['category']}» нет ни одного подрядчика"
+            ]
+            + [f"в городе {city} их {elsewhere[city]}" for city in where]
+            or [f"категории «{req['category']}» нет нигде в каталоге"],
         }
 
     relaxed = {
         key: _relaxed(req, key)
         for key in ("date", "budget_kzt", "event_format", "language", "duration_hours")
     }
+    nearby = _nearby_dates(req, requested)
+    budget_needed = _budget_needed(req)
+    season = _season(req)
     return {
         "outcome": "matched" if passed else "all_filtered_out",
         "in_city_and_category": len(pool),
@@ -469,11 +481,103 @@ def diagnose_request(
         # Сколько кандидатов появится, если снять ровно одно условие. None — оно не задано.
         "if_relaxed": relaxed,
         "single_change_helps": any(bool(v) for v in relaxed.values()),
-        "nearby_dates": _nearby_dates(req, requested),
-        "budget_needed_kzt": _budget_needed(req),
-        "season_context": _season(req),
+        "nearby_dates": nearby,
+        "budget_needed_kzt": budget_needed,
+        "season_context": season,
+        # Готовые формулировки: модель их вплетает, а не сочиняет — меньше выдумок и быстрее ответ
+        "suggestions": _suggestions(req, relaxed, nearby, budget_needed),
+        "season_note": _season_note(req, season),
         "rejected": rejected[:MAX_REJECTED_SHOWN],
     }
+
+
+_MONTHS_GENITIVE = {
+    1: "января", 2: "февраля", 3: "марта", 4: "апреля", 5: "мая", 6: "июня",
+    7: "июля", 8: "августа", 9: "сентября", 10: "октября", 11: "ноября", 12: "декабря",
+}
+
+
+def _plural(count: int, one: str, few: str, many: str) -> str:
+    """Русские числительные: 1 подрядчик, 2 подрядчика, 5 подрядчиков."""
+    tail, hundred = count % 10, count % 100
+    if 11 <= hundred <= 14 or tail == 0 or tail >= 5:
+        form = many
+    elif tail == 1:
+        form = one
+    else:
+        form = few
+    return f"{count} {form}"
+
+
+def _people(count: int) -> str:
+    return _plural(count, "подрядчик", "подрядчика", "подрядчиков")
+
+
+def _money(amount: int) -> str:
+    return f"{amount:,}".replace(",", " ") + " ₸"
+
+
+def _human_date(iso: str) -> str:
+    day = date.fromisoformat(iso)
+    return f"{day.day} {_MONTHS_GENITIVE[day.month]}"
+
+
+def _suggestions(req: dict, relaxed: dict, nearby: list[dict], budget_needed: int | None) -> list[str]:
+    """Минимальные изменения запроса, каждое из которых само по себе даёт результат."""
+    out = []
+    if nearby:
+        best = nearby[0]
+        out.append(f"перенести дату на {_human_date(best['date'])} — освободится {_people(best['available'])}")
+    if budget_needed and relaxed.get("budget_kzt"):
+        out.append(
+            f"поднять бюджет до {_money(budget_needed)} — пройдёт {_people(relaxed['budget_kzt'])}"
+        )
+    if relaxed.get("language"):
+        out.append(f"снять требование по языку — пройдёт {_people(relaxed['language'])}")
+    if relaxed.get("duration_hours"):
+        out.append(f"снять требование по длительности — пройдёт {_people(relaxed['duration_hours'])}")
+    if relaxed.get("event_format"):
+        out.append(
+            f"рассмотреть подрядчиков, не заявивших формат «{req['event_format']}» — их {relaxed['event_format']}"
+        )
+    if not out:
+        out.append("ни одно одиночное послабление не помогает: кандидаты не проходят сразу по нескольким условиям")
+    return out
+
+
+def _season_note(req: dict, season: dict) -> str | None:
+    """Бедная выдача в декабре — это сезон, а не сбой. Пусть так и будет сказано."""
+    averages = (season or {}).get("average_free_per_month") or {}
+    if len(averages) < 2 or not req.get("date"):
+        return None
+    try:
+        month = req["date"][:7]
+    except TypeError:
+        return None
+    if month not in averages:
+        return None
+    others = [v for k, v in averages.items() if k != month]
+    if not others or averages[month] >= min(others):
+        return None
+    best_month, best_value = max(
+        ((k, v) for k, v in averages.items() if k != month), key=lambda kv: kv[1]
+    )
+    total = season.get("total_in_category")
+    return (
+        f"в категории «{req['category']}» в {_month_name(month)} свободно в среднем "
+        f"{averages[month]} из {total}, в {_month_name(best_month)} — {best_value}: это сезон, а не сбой"
+    )
+
+
+_MONTHS_PREPOSITIONAL = {
+    "09": "сентябре", "10": "октябре", "11": "ноябре", "12": "декабре",
+    "01": "январе", "02": "феврале", "03": "марте", "04": "апреле",
+    "05": "мае", "06": "июне", "07": "июле", "08": "августе",
+}
+
+
+def _month_name(month: str) -> str:
+    return _MONTHS_PREPOSITIONAL.get(month[-2:], month)
 
 
 def _nearby_dates(req: dict, requested: date) -> list[dict]:
