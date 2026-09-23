@@ -78,6 +78,7 @@ export default function Page() {
   const [identitiesHidden, setIdentitiesHidden] = useState(false);
   const [comparisonOpen, setComparisonOpen] = useState(false);
   const [comparisonDate, setComparisonDate] = useState("");
+  const [comparisonResultDate, setComparisonResultDate] = useState("");
   const [comparisonRun, setComparisonRun] = useState<Run | null>(null);
   const [comparisonBusy, setComparisonBusy] = useState(false);
   const [primaryRequest, setPrimaryRequest] = useState<RequestForm | null>(null);
@@ -152,6 +153,7 @@ export default function Page() {
       setComparisonRun(null);
       setComparisonOpen(false);
       setComparisonDate("");
+      setComparisonResultDate("");
       setCollapsed(true);
     } catch (e) {
       setError((e as Error).message);
@@ -183,11 +185,14 @@ export default function Page() {
   async function compareDate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const request = primaryRequest ?? form;
-    if (!comparisonDate || comparisonDate === request.date || comparisonActive) return;
+    if (!comparisonDate || comparisonDate === request.date || comparisonActive || comparisonBusy || active || busy) return;
     setError("");
     setComparisonBusy(true);
     try {
-      setComparisonRun(await api.startRun(buildRequestText({ ...request, date: comparisonDate }), ""));
+      const requestedDate = comparisonDate;
+      const comparison = await api.startRun(buildRequestText({ ...request, date: requestedDate }), "");
+      setComparisonRun(comparison);
+      setComparisonResultDate(requestedDate);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -339,7 +344,7 @@ export default function Page() {
             {primaryResult && (
               <div className="comparison-controls">
                 {!comparisonOpen ? (
-                  <button className="btn btn-quiet" type="button" disabled={!!active} onClick={openComparison}>
+                  <button className="btn btn-quiet" type="button" disabled={busy || !!active} onClick={openComparison}>
                     {DATE_COMPARISON.openButton}
                   </button>
                 ) : (
@@ -355,7 +360,7 @@ export default function Page() {
                     <button
                       className="btn btn-quiet"
                       type="submit"
-                      disabled={comparisonBusy || !!comparisonActive || !comparisonDate || comparisonDate === primaryDate}
+                      disabled={busy || !!active || comparisonBusy || !!comparisonActive || !comparisonDate || comparisonDate === primaryDate}
                     >
                       {comparisonBusy || comparisonActive ? DATE_COMPARISON.comparingButton : DATE_COMPARISON.compareButton}
                     </button>
@@ -387,9 +392,9 @@ export default function Page() {
                     mock={!!health?.mock}
                     identitiesHidden={identitiesHidden}
                     onToggleIdentities={() => setIdentitiesHidden((hidden) => !hidden)}
-                    title={DATE_COMPARISON.secondTitle(comparisonDate)}
+                    title={DATE_COMPARISON.secondTitle(comparisonResultDate)}
                     titleId="results-comparison-title"
-                    showIdentityToggle={false}
+                    showIdentityToggle={!primaryResult?.cards.length}
                     differingIds={differingIds}
                   />
                 </div>
