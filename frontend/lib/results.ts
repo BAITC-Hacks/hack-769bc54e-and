@@ -3,7 +3,7 @@
  * модель даёт только тексты объяснений: нумерованный список `**Имя** — объяснение`
  * (REPORT_FORMAT в backend/agent/core/domains/contractors.py). Здесь они сводятся вместе.
  */
-import type { ContractorCard, Run, SearchResult } from "./types";
+import type { ContractorCard, RejectReason, Run, SearchResult } from "./types";
 
 function isSearchResult(value: unknown): value is SearchResult {
   if (typeof value !== "object" || value === null) return false;
@@ -28,22 +28,15 @@ export interface ReportItem {
   text: string;
 }
 
-export interface ReportParts {
-  intro: string;
-  items: ReportItem[];
-  outro: string;
-}
-
-export const EMPTY_REPORT: ReportParts = { intro: "", items: [], outro: "" };
-
 const ITEM = /^\d+[.)]\s+(.*)$/;
 // «**Имя** — текст», «**Имя**: текст», «**Имя** (Ведущий) — текст»
 const NAMED = /^\*\*(.+?)\*\*(?:[^—–:]{0,40}[—–:])?\s*(.*)$/;
 
-/** Разобрать ответ модели: строка до списка, пункты списка, строки после него. */
-export function parseReport(text: string): ReportParts {
-  const intro: string[] = [];
-  const outro: string[] = [];
+/**
+ * Пункты нумерованного списка из ответа модели. Строки до и после списка не берём:
+ * сколько нашлось и что изменить, интерфейс показывает из данных инструмента — точно.
+ */
+export function parseItems(text: string): ReportItem[] {
   const items: ReportItem[] = [];
   let inCode = false;
   for (const raw of text.split("\n")) {
@@ -52,16 +45,12 @@ export function parseReport(text: string): ReportParts {
       inCode = !inCode;
       continue;
     }
-    if (inCode || !line) continue;
-    const item = line.match(ITEM);
-    if (item) {
-      const named = item[1].match(NAMED);
-      items.push(named ? { name: named[1].trim(), text: named[2].trim() } : { name: "", text: item[1].trim() });
-    } else {
-      (items.length ? outro : intro).push(line);
-    }
+    const item = inCode ? null : line.match(ITEM);
+    if (!item) continue;
+    const named = item[1].match(NAMED);
+    items.push(named ? { name: named[1].trim(), text: named[2].trim() } : { name: "", text: item[1].trim() });
   }
-  return { intro: intro.join("\n\n"), items, outro: outro.join("\n\n") };
+  return items;
 }
 
 const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
@@ -84,8 +73,6 @@ export const kzt = (n: number) => `${n.toLocaleString("ru-RU")} ₸`;
 
 /** Цитата обрезана бэкендом по длине — многоточие показывает, что фраза не закончена. */
 export const quoteText = (quote: string) => (/[.!?…»]$/.test(quote) ? quote : `${quote}…`);
-
-const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /**
  * Объяснение без модели — только из посчитанных фактов. Нужно в mock-режиме: проверяющий
@@ -111,3 +98,40 @@ export function factsLine(card: ContractorCard): string {
   if (bits.length) out.push(`${capitalize(bits.join("; "))}.`);
   return out.join(" ");
 }
+
+// ---------- Исход подбора ----------
+
+/**
+ * Четыре вида ответа, которые жюри должно различать с первого взгляда (R12):
+ * полная выдача, неполная, никто не подошёл, такого в каталоге нет.
+ */
+export type OutcomeKind = "full" | "partial" | "none" | "absent";
+
+export function outcomeKind(found: SearchResult): OutcomeKind {
+  if (found.outcome === "matched") return found.cards.length >= 3 ? "full" : "partial";
+  if (found.outcome === "all_filtered_out") return "none";
+  return "absent";
+}
+
+/** Причины отсева по убыванию: сверху то, что мешает сильнее всего. */
+export function reasonCounts(found: SearchResult): [RejectReason, number][] {
+  const counts = found.rejected_by_reason ?? {};
+  return (Object.entries(counts) as [RejectReason, number][])
+    .filter(([, n]) => n > 0)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+}
+
+const words = (s: string) => new Set(norm(s).split(" ").filter(Boolean));
+
+/**
+ * Подсказки диагностики без тех, что лишь пересказывают note: для «категории нет в городе»
+ * первая подсказка — это та же фраза в другом порядке слов, а note уже стоит в заголовке.
+ */
+export function suggestions(found: SearchResult): string[] {
+  const list = found.diagnosis?.suggestions ?? [];
+  if (!found.note) return list;
+  const noteWords = words(found.note);
+  return list.filter((line) => ![...words(line)].every((w) => noteWords.has(w)));
+}
+
+export const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);

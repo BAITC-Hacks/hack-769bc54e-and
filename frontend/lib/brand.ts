@@ -68,15 +68,49 @@ export function buildRequestText(request: ContractorRequestText): string {
 
 /** Подписи блока с карточками подбора. */
 export const RESULTS = {
-  title: "Кого подобрали",
-  count: (shown: number, passed: number, total: number) =>
-    `Подходят ${passed} из ${total} в этой категории и городе · показано ${shown}`,
+  title: "Результат подбора",
   priceUnknown: "цена не указана",
   pricePrefix: "от",
   writing: "Модель пишет объяснение…",
   factsNote: "Без модели: собрано из фактов каталога",
   quoteLabel: "Из описания подрядчика",
   modelText: "Текст ответа модели",
+  searching: "Разбираю запрос и ищу по каталогу…",
+  failedTitle: "Подбор не состоялся",
+  failedHint: "Что пошло не так — в журнале ниже.",
+  whyTitle: "Почему",
+  whyHint: "У одного кандидата может быть несколько причин.",
+  changeTitle: "Что можно сделать",
+} as const;
+
+/** Исход подбора: метка, заголовок и пояснение. Четыре вида различимы с первого взгляда (R12). */
+export const OUTCOME = {
+  full: {
+    badge: "Полная выдача",
+    title: (shown: number, passed: number) => `${shown} лучших из ${passed} подходящих`,
+  },
+  partial: {
+    badge: "Меньше трёх",
+    title: (shown: number) => (shown === 1 ? "Подходит только один" : `Подходят только ${shown}`),
+  },
+  none: {
+    badge: "Никто не подошёл",
+    title: (total: number) => `Отсеяны все кандидаты в этой категории и городе: ${total}`,
+  },
+  absent: {
+    badge: "Нет в каталоге",
+    unknownTitle: "Такого значения нет в каталоге",
+  },
+  passed: (passed: number, total: number) => `Прошли фильтры ${passed} из ${total} в этой категории и городе`,
+} as const;
+
+/** Причины отсева: код из бэкенда → как это сказать человеку. */
+export const REJECT_REASONS = {
+  busy: "заняты на эту дату",
+  budget: "дороже бюджета",
+  format: "не берут этот формат",
+  language: "не работают на этом языке",
+  duration: "не работают столько часов",
 } as const;
 
 /** Как называть незаполненное обязательное поле в подсказке под кнопкой. */

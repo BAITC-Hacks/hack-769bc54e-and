@@ -50,7 +50,23 @@ export interface Health {
 // ---------- Результат search_contractors (backend/agent/core/domains/contractors.py) ----------
 // Приходит не из views.py, а внутри шага журнала: Step.content.result у tool_result.
 
-export type SearchOutcome = "matched" | "all_filtered_out" | "no_category_in_city";
+export type SearchOutcome =
+  | "matched"
+  | "all_filtered_out"
+  | "no_category_in_city"
+  | "unknown_city"
+  | "unknown_category";
+
+/** Коды причин отсева из _reasons: по ним считается rejected_by_reason. */
+export type RejectReason = "busy" | "format" | "budget" | "language" | "duration";
+
+/** Диагностика приходит вместе с поиском, когда карточек меньше трёх. */
+export interface Diagnosis {
+  /** Готовые формулировки «что изменить» — показываются дословно */
+  suggestions: string[];
+  /** Бедный месяц — это сезон, а не сбой; null, если месяц не выделяется */
+  season_note?: string | null;
+}
 
 /** Посчитанные факты совпадения: на них модель строит объяснение. */
 export interface CardMatch {
@@ -78,10 +94,14 @@ export interface ContractorCard {
 
 export interface SearchResult {
   outcome: SearchOutcome;
-  in_city_and_category: number;
+  /** Нет при unknown_city и unknown_category */
+  in_city_and_category?: number;
   /** Нет при outcome = no_category_in_city */
   passed_filters?: number;
   cards: ContractorCard[];
+  /** Сколько отсеянных задела каждая причина; у одного кандидата их может быть несколько */
+  rejected_by_reason?: Partial<Record<RejectReason, number>>;
+  diagnosis?: Diagnosis;
   note?: string;
   warning?: string;
   fewer_than_three?: boolean;
