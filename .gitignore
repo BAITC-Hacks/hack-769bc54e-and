@@ -8,5 +8,5 @@ node_modules/
 .DS_Store
 *.tsbuildinfo
 
-# Личные заметки для Claude Code — в репозиторий не идут
-CLAUDE.md
+# Служебный файл Next.js, восстанавливается сам
+frontend/CLAUDE.md
