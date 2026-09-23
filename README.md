@@ -21,7 +21,7 @@
 - **Как запустить.** `docker compose up --build` в корне клона - без `.env` и ключей,
   интерфейс на http://localhost:3000. Без Docker: `python scripts/dev.py setup`, затем
   `backend` и `frontend` в двух терминалах. [Подробнее](#инструкции-по-установке)
-- **Попробовать без установки.** Публичная версия: https://frontend-production-ad7c4.up.railway.app —
+- **Попробовать без установки.** Публичная версия: https://frontend-production-ad7c4.up.railway.app -
   та же версия, что в `main`, живая модель `gpt-5.4-mini`, доступна минимум до 30.09.2026.
   Проверка по README от неё не зависит: всё ниже запускается из клона без сети и ключей.
 - **Технологии.** Python и Django, Next.js и TypeScript, SQLite; языковая модель через
