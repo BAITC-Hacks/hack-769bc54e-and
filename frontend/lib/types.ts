@@ -60,6 +60,12 @@ export type SearchOutcome =
 /** Коды причин отсева из _reasons: по ним считается rejected_by_reason. */
 export type RejectReason = "busy" | "format" | "budget" | "language" | "duration";
 
+export interface RejectedContractor {
+  id: string;
+  name: string;
+  reasons: Array<{ code: RejectReason; detail: string }>;
+}
+
 /** Диагностика приходит вместе с поиском, когда карточек меньше трёх. */
 export interface Diagnosis {
   /** Готовые формулировки «что изменить» — показываются дословно */
@@ -99,6 +105,8 @@ export interface SearchResult {
   /** Нет при outcome = no_category_in_city */
   passed_filters?: number;
   cards: ContractorCard[];
+  /** Отсеянные кандидаты и готовые человекочитаемые причины из инструмента. */
+  rejected?: RejectedContractor[];
   /** Сколько отсеянных задела каждая причина; у одного кандидата их может быть несколько */
   rejected_by_reason?: Partial<Record<RejectReason, number>>;
   diagnosis?: Diagnosis;

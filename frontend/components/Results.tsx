@@ -139,6 +139,30 @@ function Diagnosis({ found }: { found: SearchResult }) {
   );
 }
 
+/** Компактный список отсеянных: разворачивается только по запросу пользователя. */
+function Rejected({ found, hideIdentity }: { found: SearchResult; hideIdentity: boolean }) {
+  const rejected = found.rejected ?? [];
+  if (!rejected.length) return null;
+
+  return (
+    <details className="rejected">
+      <summary>{RESULTS.rejectedTitle(rejected.length)}</summary>
+      <ol>
+        {rejected.map((contractor, index) => (
+          <li key={contractor.id}>
+            <strong>{hideIdentity ? RESULTS.hiddenRejectedLabel(index + 1) : contractor.name}</strong>
+            <ul>
+              {contractor.reasons.map((reason) => (
+                <li key={reason.code}>{reason.detail}</li>
+              ))}
+            </ul>
+          </li>
+        ))}
+      </ol>
+    </details>
+  );
+}
+
 /**
  * Итог подбора: исход, карточки из search_contractors в его порядке, объяснения — из ответа
  * модели, диагностика — из инструмента. Пустого экрана нет ни в одном состоянии запуска.
@@ -219,6 +243,7 @@ export function Results({
           ))}
         </ol>
       )}
+      <Rejected found={found} hideIdentity={identitiesHidden} />
       {outcomeKind(found) !== "full" && <Diagnosis found={found} />}
     </section>
   );

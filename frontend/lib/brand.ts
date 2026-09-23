@@ -84,6 +84,8 @@ export const RESULTS = {
   hideIdentities: "Скрыть имена",
   showIdentities: "Показать имена",
   hiddenCardLabel: "Объяснение без имени",
+  rejectedTitle: (count: number) => `Ещё ${count} кандидатов не прошли`,
+  hiddenRejectedLabel: (position: number) => `Кандидат ${position}`,
 } as const;
 
 /** Исход подбора: метка, заголовок и пояснение. Четыре вида различимы с первого взгляда (R12). */
