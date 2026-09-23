@@ -4,7 +4,7 @@ import ReactMarkdown from "react-markdown";
 import { DATE_COMPARISON, HONESTY_TEXT, OUTCOME, REJECT_REASONS, RESULTS } from "@/lib/brand";
 import {
   capitalize, explanations, factsLine, findSearchResult, kzt, outcomeKind, parseItems, quoteText,
-  reasonCounts, suggestions,
+  reasonCounts,
 } from "@/lib/results";
 import type { ContractorCard, Run, SearchResult } from "@/lib/types";
 
@@ -103,7 +103,7 @@ function Outcome({ found }: { found: SearchResult }) {
  */
 function Diagnosis({ found }: { found: SearchResult }) {
   const reasons = reasonCounts(found);
-  const tips = suggestions(found);
+  const tips = found.diagnosis?.suggestions ?? [];
   const season = found.diagnosis?.season_note;
   if (!reasons.length && !tips.length && !season) return null;
 
@@ -128,11 +128,11 @@ function Diagnosis({ found }: { found: SearchResult }) {
           {tips.length > 0 && (
             <ul className="tips">
               {tips.map((tip) => (
-                <li key={tip}>{capitalize(tip)}</li>
+                <li key={tip}>{tip}</li>
               ))}
             </ul>
           )}
-          {season && <p className="season">{capitalize(season)}</p>}
+          {season && <p className="season">{season}</p>}
         </section>
       )}
     </div>

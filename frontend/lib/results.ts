@@ -128,17 +128,4 @@ export function reasonCounts(found: SearchResult): [RejectReason, number][] {
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 }
 
-const words = (s: string) => new Set(norm(s).split(" ").filter(Boolean));
-
-/**
- * Подсказки диагностики без тех, что лишь пересказывают note: для «категории нет в городе»
- * первая подсказка — это та же фраза в другом порядке слов, а note уже стоит в заголовке.
- */
-export function suggestions(found: SearchResult): string[] {
-  const list = found.diagnosis?.suggestions ?? [];
-  if (!found.note) return list;
-  const noteWords = words(found.note);
-  return list.filter((line) => ![...words(line)].every((w) => noteWords.has(w)));
-}
-
 export const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
