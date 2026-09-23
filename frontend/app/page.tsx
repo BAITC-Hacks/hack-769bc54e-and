@@ -1,10 +1,30 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Journal } from "@/components/Journal";
 import { api } from "@/lib/api";
-import { SUMMARY_LABELS, STATUS_TEXT, brand } from "@/lib/brand";
-import type { Health, Run, Sample } from "@/lib/types";
+import { SUMMARY_LABELS, STATUS_TEXT, brand, buildRequestText } from "@/lib/brand";
+import type { ContractorOptions, Health, Run } from "@/lib/types";
+
+interface RequestForm {
+  city: string;
+  category: string;
+  date: string;
+  eventFormat: string;
+  budget: string;
+  duration: string;
+  language: string;
+}
+
+const EMPTY_FORM: RequestForm = {
+  city: "",
+  category: "",
+  date: "",
+  eventFormat: "",
+  budget: "",
+  duration: "",
+  language: "",
+};
 
 /** Итог запуска цифрами. Это то, что называют в питче: «столько-то вместо столько-то». */
 function Summary({ run }: { run: Run }) {
@@ -31,9 +51,8 @@ function Summary({ run }: { run: Run }) {
 }
 
 export default function Page() {
-  const [task, setTask] = useState("");
-  const [input, setInput] = useState("");
-  const [samples, setSamples] = useState<Sample[]>([]);
+  const [form, setForm] = useState<RequestForm>(EMPTY_FORM);
+  const [options, setOptions] = useState<ContractorOptions | null>(null);
   const [health, setHealth] = useState<Health | null>(null);
   const [run, setRun] = useState<Run | null>(null);
   const [busy, setBusy] = useState(false);
@@ -43,7 +62,10 @@ export default function Page() {
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
-    api.samples().then(setSamples).catch(() => undefined);
+    api
+      .options()
+      .then(setOptions)
+      .catch(() => setError(brand.optionsError));
     api
       .health()
       .then(setHealth)
@@ -73,11 +95,13 @@ export default function Page() {
     return () => clearInterval(timer);
   }, [run?.id, active]);
 
-  async function start() {
+  async function start(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!form.city || !form.category || !form.date || !form.eventFormat || !form.budget) return;
     setError("");
     setBusy(true);
     try {
-      setRun(await api.startRun(task, input));
+      setRun(await api.startRun(buildRequestText(form), ""));
       setCollapsed(true);
     } catch (e) {
       setError((e as Error).message);
@@ -101,6 +125,13 @@ export default function Page() {
 
   const focused = !!run && collapsed;
   const shellClass = focused ? "shell shell-focused" : run ? "shell" : "shell shell-intro";
+  const requiredComplete = !!(
+    form.city && form.category && form.date && form.eventFormat && Number(form.budget) > 0
+  );
+
+  function update<K extends keyof RequestForm>(field: K, value: RequestForm[K]) {
+    setForm((current) => ({ ...current, [field]: value }));
+  }
 
   return (
     <main className={shellClass}>
@@ -110,39 +141,71 @@ export default function Page() {
           <p className="lede">{brand.lede}</p>
         </header>
 
-        <div className="samples">
-          <span id="samples-label">Попробовать на примере</span>
-          <div role="group" aria-labelledby="samples-label">
-            {samples.map((s) => (
-              <button
-                key={s.id}
-                className="chip"
-                onClick={() => {
-                  setTask(s.task);
-                  setInput(s.input);
-                }}
-              >
-                {s.label}
-              </button>
-            ))}
+        <form className="request-form" onSubmit={start}>
+          <div className="field-grid">
+            <div className="field">
+              <label htmlFor="city">{brand.cityLabel}</label>
+              <select id="city" required value={form.city} onChange={(e) => update("city", e.target.value)}>
+                <option value="">{brand.requiredPlaceholder}</option>
+                {options?.cities.map((value) => <option key={value}>{value}</option>)}
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="category">{brand.categoryLabel}</label>
+              <select id="category" required value={form.category} onChange={(e) => update("category", e.target.value)}>
+                <option value="">{brand.requiredPlaceholder}</option>
+                {options?.categories.map((value) => <option key={value}>{value}</option>)}
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="date">{brand.dateLabel}</label>
+              <input id="date" type="date" required value={form.date} onChange={(e) => update("date", e.target.value)} />
+            </div>
+            <div className="field">
+              <label htmlFor="event-format">{brand.eventFormatLabel}</label>
+              <select id="event-format" required value={form.eventFormat} onChange={(e) => update("eventFormat", e.target.value)}>
+                <option value="">{brand.requiredPlaceholder}</option>
+                {options?.event_formats.map((value) => <option key={value}>{value}</option>)}
+              </select>
+            </div>
+            <div className="field field-wide">
+              <label htmlFor="budget">{brand.budgetLabel}</label>
+              <input
+                id="budget"
+                type="number"
+                min="1"
+                step="1000"
+                required
+                value={form.budget}
+                placeholder={brand.budgetPlaceholder}
+                onChange={(e) => update("budget", e.target.value)}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="duration">{brand.durationLabel}</label>
+              <input
+                id="duration"
+                type="number"
+                min="1"
+                step="1"
+                value={form.duration}
+                placeholder={brand.durationPlaceholder}
+                onChange={(e) => update("duration", e.target.value)}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="language">{brand.languageLabel}</label>
+              <select id="language" value={form.language} onChange={(e) => update("language", e.target.value)}>
+                <option value="">{brand.optionalPlaceholder}</option>
+                {options?.languages.map((value) => <option key={value}>{value}</option>)}
+              </select>
+            </div>
           </div>
-        </div>
 
-        <label htmlFor="task">{brand.taskLabel}</label>
-        <textarea
-          id="task"
-          rows={3}
-          value={task}
-          onChange={(e) => setTask(e.target.value)}
-          placeholder={brand.taskPlaceholder}
-        />
-
-        <label htmlFor="input">{brand.inputLabel}</label>
-        <textarea id="input" className="mono" rows={16} value={input} onChange={(e) => setInput(e.target.value)} spellCheck={false} />
-
-        <button className="btn btn-primary" onClick={start} disabled={busy || !task.trim() || !!active}>
-          {busy ? brand.startingButton : brand.startButton}
-        </button>
+          <button className="btn btn-primary" type="submit" disabled={busy || !requiredComplete || !!active}>
+            {busy ? brand.startingButton : brand.startButton}
+          </button>
+        </form>
 
         {error && <p className="error" role="alert">{error}</p>}
         {health && (

@@ -5,22 +5,55 @@ import type { RunStatus } from "./types";
  * Больше нигде в интерфейсе названий и доменных формулировок быть не должно.
  */
 export const brand = {
-  name: "Агент",
-  title: "Агент — пошаговый разбор с подтверждением человека",
+  name: "Точный подрядчик",
+  title: "Точный подрядчик — умный подбор для мероприятий",
   description:
-    "Агент разбирает материал по шагам, показывает каждое действие и спрашивает человека перед изменениями во внешних системах.",
-  lede: "Разбирает ваш материал по шагам, показывает каждое действие и останавливается, чтобы спросить вас перед тем, что что-то меняет.",
-  taskLabel: "Что нужно выяснить",
-  taskPlaceholder: "Например: есть ли отклонения и что с ними делать?",
-  inputLabel: "Материал: таблица, выгрузка, текст или ссылка",
-  startButton: "Запустить агента",
-  startingButton: "Запускаю",
-  emptyTitle: "Журнал пока пуст",
+    "Подбор до трёх свободных event-подрядчиков с понятным объяснением каждого результата.",
+  lede: "Подбирает до трёх свободных подрядчиков по каталогу и объясняет каждый результат конкретными фактами.",
+  cityLabel: "Город",
+  categoryLabel: "Категория",
+  dateLabel: "Дата",
+  eventFormatLabel: "Формат мероприятия",
+  budgetLabel: "Бюджет на подрядчика, ₸",
+  durationLabel: "Длительность, часов (необязательно)",
+  languageLabel: "Язык (необязательно)",
+  requiredPlaceholder: "Выберите значение",
+  optionalPlaceholder: "Не важно",
+  budgetPlaceholder: "Например, 900000",
+  durationPlaceholder: "Например, 5",
+  optionsError: "Не удалось загрузить варианты формы.",
+  startButton: "Подобрать подрядчиков",
+  startingButton: "Подбираю",
+  emptyTitle: "Здесь появится подбор",
   emptyHint:
-    "Выберите пример слева или вставьте свой материал. Здесь появится каждый шаг агента: что он решил, какой инструмент вызвал и что получил.",
+    "Заполните пять обязательных полей. Агент покажет ход отбора и объяснит, почему каждый подрядчик попал в результат.",
   editRequest: "Изменить запрос",
   hidePanel: "Свернуть панель",
 } as const;
+
+export interface ContractorRequestText {
+  city: string;
+  category: string;
+  date: string;
+  eventFormat: string;
+  budget: string;
+  duration: string;
+  language: string;
+}
+
+/** The agent still accepts prose, so the structured form produces one stable request. */
+export function buildRequestText(request: ContractorRequestText): string {
+  const parts = [
+    `Город: ${request.city}`,
+    `Категория: ${request.category}`,
+    `Дата: ${request.date}`,
+    `Формат мероприятия: ${request.eventFormat}`,
+    `Бюджет на подрядчика: ${request.budget} ₸`,
+  ];
+  if (request.duration) parts.push(`Длительность: ${request.duration} ч`);
+  if (request.language) parts.push(`Язык: ${request.language}`);
+  return `Подбери подрядчиков. ${parts.join(". ")}.`;
+}
 
 /** Подписи полоски итогов. Цифры под ними — главный аргумент в питче. */
 export const SUMMARY_LABELS = {

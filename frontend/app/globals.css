@@ -50,25 +50,15 @@ h1, h2, p { margin: 0; }
 .brief h1 { font-size: 2.6rem; font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
 .lede { margin-top: 12px; color: var(--muted); max-width: 38ch; }
 
-.samples { margin: 22px 0 8px; font-size: 0.875rem; color: var(--muted); }
-.samples > div { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+label { font-size: 0.875rem; font-weight: 600; }
 
-.chip {
-  font: 500 0.875rem var(--sans);
-  color: var(--ink);
-  background: transparent;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 6px 14px;
-  cursor: pointer;
-}
-.chip:hover { border-color: var(--ink); }
+.request-form { margin-top: 24px; }
+.field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.field-wide { grid-column: 1 / -1; }
 
-label { font-size: 0.875rem; font-weight: 600; margin-top: 10px; }
-
-textarea {
+textarea, input, select {
   width: 100%;
-  resize: vertical;
   padding: 12px 14px;
   font: 400 1rem/1.5 var(--sans);
   color: var(--ink);
@@ -76,6 +66,8 @@ textarea {
   border: 1px solid var(--line);
   border-radius: 6px;
 }
+textarea { resize: vertical; }
+select { cursor: pointer; }
 textarea.mono { font: 400 0.8125rem/1.6 var(--mono); white-space: pre; overflow-x: auto; }
 
 .btn {
@@ -90,7 +82,7 @@ textarea.mono { font: 400 0.8125rem/1.6 var(--mono); white-space: pre; overflow-
 .btn-approve { background: var(--ink); color: var(--surface); }
 .btn-quiet { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
 
-:is(button, textarea, summary):focus-visible { outline: 3px solid var(--gate); outline-offset: 2px; }
+:is(button, textarea, input, select, summary):focus-visible { outline: 3px solid var(--gate); outline-offset: 2px; }
 
 .error { color: var(--threat); font-weight: 500; }
 .meta { font-size: 0.8125rem; color: var(--muted); }
@@ -238,6 +230,8 @@ details[open] summary { margin-bottom: 8px; }
   .brief { position: static; max-height: none; padding: 28px 20px; }
   .case { border-left: 0; border-top: 1px solid var(--line); padding-top: 28px; }
   .empty { margin-top: 0; }
+  .field-grid { grid-template-columns: 1fr; }
+  .field-wide { grid-column: auto; }
 }
 
 @media (prefers-reduced-motion: reduce) {
