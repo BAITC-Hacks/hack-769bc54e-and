@@ -466,3 +466,38 @@ class ContractorDomainTests(TestCase):
         text = self.m.offline_report({"search_contractors": r})
         self.assertIn("не нашлось", text)
         self.assertIn("в каталоге 2", text)
+
+    def test_single_card_gets_no_comparative_claim(self):
+        r = self.search(date="2026-12-26")
+        if len(r["cards"]) != 1:
+            self.skipTest("на этой дате не одна карточка")
+        self.assertIsNone(r["cards"][0]["match"]["lead"])
+
+    def test_lead_is_never_repeated_in_standouts(self):
+        for card in self.search(date="2026-10-15")["cards"]:
+            lead = card["match"]["lead"]
+            if lead:
+                self.assertNotIn(lead, card["match"]["standouts"])
+
+    def test_middle_card_is_compared_with_the_first_not_numbered(self):
+        cards = self.search(city="Алматы", category="Банкетный зал",
+                            date="2026-10-24", budget_kzt=3000000)["cards"]
+        for card in cards:
+            lead = card["match"]["lead"]
+            if lead:
+                self.assertNotIn("по совокупности условий", lead)
+
+    def test_other_cities_are_suggested_only_when_nothing_is_shown(self):
+        with_cards = self.search(city="Алматы", category="Флорист",
+                                 date="2026-11-14", budget_kzt=1000000)
+        if with_cards["cards"] and "diagnosis" in with_cards:
+            joined = " ".join(with_cards["diagnosis"]["suggestions"])
+            self.assertNotIn("в других городах", joined)
+        empty = self.search(city="Астана", category="Лайв-бэнд", budget_kzt=1500000)
+        self.assertTrue(any("Алматы" in s for s in empty["diagnosis"]["suggestions"]))
+
+    def test_every_profile_can_produce_a_quote(self):
+        # Описание целиком капсом — не повод остаться без доказательства
+        missing = [p["name"] for p in self.m.catalog()
+                   if self.m._quote(p["description"], set(), fallback={"ведущ"}) is None]
+        self.assertEqual(missing, [])

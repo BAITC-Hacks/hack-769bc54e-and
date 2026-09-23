@@ -5,7 +5,7 @@
 
 **Кейсов: 10 · прошло: 10 · точность: 100%**
 
-Режим: настоящая модель `gpt-5.4-mini` · токенов: 60266 · самый долгий ответ: 4.6 с
+Режим: настоящая модель `gpt-5.4-mini` · токенов: 60771 · самый долгий ответ: 4.3 с
 при ориентире 10 с из Definition of Done.
 
 ## Что проверяется в каждом кейсе
@@ -29,16 +29,16 @@
 
 | Кейс | Результат | Время | Вызовов модели | Замечания |
 |---|---|---|---|---|
-| dense-wedding | ✅ | 4.6 с | 2 | — |
-| all-busy-and-pricey | ✅ | 2.6 с | 2 | — |
-| no-category-in-city | ✅ | 2.7 с | 2 | — |
-| over-budget | ✅ | 3.3 с | 2 | — |
-| same-request-two-dates | ✅ | 3.4 с | 2 | — |
-| venue-hall | ✅ | 3.9 с | 2 | — |
-| rare-category-with-results | ✅ | 3.3 с | 2 | — |
-| language-narrows-the-result | ✅ | 3.6 с | 2 | — |
-| duration-narrows-the-result | ✅ | 4.1 с | 2 | — |
-| wishes-match-description | ✅ | 3.4 с | 2 | — |
+| dense-wedding | ✅ | 4.3 с | 2 | — |
+| all-busy-and-pricey | ✅ | 2.2 с | 2 | — |
+| no-category-in-city | ✅ | 2.3 с | 2 | — |
+| over-budget | ✅ | 2.3 с | 2 | — |
+| same-request-two-dates | ✅ | 2.8 с | 2 | — |
+| venue-hall | ✅ | 3.2 с | 2 | — |
+| rare-category-with-results | ✅ | 2.7 с | 2 | — |
+| language-narrows-the-result | ✅ | 3.0 с | 2 | — |
+| duration-narrows-the-result | ✅ | 3.0 с | 2 | — |
+| wishes-match-description | ✅ | 3.0 с | 2 | — |
 
 ## Как читать время
 

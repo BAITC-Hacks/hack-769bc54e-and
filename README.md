@@ -284,7 +284,7 @@ python scripts/dev.py check     # тесты Django + tsc --noEmit
 python scripts/dev.py eval      # прогон кейсов, отчёт в docs/EVAL.md
 ```
 
-`docs/EVAL.md` — таблица «кейс / результат / время / вызовов модели / замечания» по набору
+`docs/EVAL.md` — отчёт о прогоне качества: что проверяется и результаты 
 из `backend/agent/evals/cases.contractors.json`: 10 кейсов на требования Definition of Done,
 последний прогон на настоящей модели — 10 из 10, все ответы быстрее порога 10 с.
 Она показывает качество решения на наборе примеров, а не на одном удачном прогоне.
@@ -446,7 +446,7 @@ python scripts/dev.py eval      # прогон кейсов, отчёт в docs/
 `TASKS.md` — доска задач команды · `CLAUDE.md` — разбор Задачи ·
 `SCOPE.md` — границы решения и известные ограничения ·
 `AGENTS.md` — правила разработки · `docs/POLOZHENIE.md` — Положение хакатона ·
-`docs/HOURLY.md` — почасовой журнал работы · `docs/EVAL.md` — результаты прогона · `docs/TEAM_WORKFLOW.md` — как работаем втроём ·
+`docs/HOURLY.md` — почасовой журнал работы · `docs/EVAL.md` — отчёт о прогоне качества: что проверяется и результаты · `docs/TEAM_WORKFLOW.md` — как работаем втроём ·
 `docs/DEMO_CHECKLIST.md` — сценарий демонстрации · `docs/PITCH.md` — заготовка питча ·
 `docs/DATASET_NOTES.md` — что мы нашли в датасете.
 

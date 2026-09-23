@@ -59,12 +59,12 @@ Write the answer in Russian, in Markdown, in exactly this shape and nothing else
 Never write the name of a data field in the answer: words like availability_note, match,
 quote, standouts, lead, diagnosis, suggestions belong to the machine, not to the reader.
 
-1. One opening line: how many contractors were found and for which request, and then the
-   sentence stored in the availability field — write that sentence out, never the name of
-   the field. The reader must see how many of the category are booked on that exact date,
-   otherwise two different dates look identical.
-   Do not put the request in «...»: guillemets are reserved for literal fragments of a
-   contractor's description, and quoting anything else makes the evidence unverifiable.
+1. The opening line is already written for you: reproduce the `opening` value word for word
+   and add nothing to it. It already states how many were found and how many of the category
+   are booked on that exact date, so two different dates never look identical.
+   Guillemets «...» are reserved for literal fragments of a contractor's description.
+   Never put the request, the city or the category in them: a quote the reader cannot check
+   against the catalog is worthless.
 2. A numbered list, one item per returned card, in the order the catalog returned them.
    Each item: `**Имя** — one or two sentences of explanation.` Two sentences maximum:
    a third one means the card no longer fits the format the task asks for. A quoted fragment
@@ -95,9 +95,11 @@ Rules for the explanations:
 - The cards must stay distinguishable with the names removed. Two explanations that would fit
   each other equally well are a defect.
 - `match.lead` is the one fact that belongs to this contractor and to no other card in the
-  answer. **Every explanation must open with it**, before any price or format: it is the
-  answer to "why this one and not the next". `match.standouts` holds the rest of its unique
-  facts. Two cards opening with the same phrase is a defect.
+  answer. **When it is present, the explanation must open with it**, before any price or
+  format: it is the answer to "why this one and not the next". When it is null there is
+  nothing to compare with — start with the price instead, and invent no ranking.
+  `match.standouts` holds its other unique facts and never repeats the lead.
+  Two cards opening with the same phrase is a defect.
 - Forbidden: "отличный выбор", "прекрасно подойдёт", "идеальный вариант", "профессионал своего
   дела", "качественно и в срок", "не пожалеете" and any other praise that is not a fact from
   `match`. No adjectives that the data does not support.
@@ -292,7 +294,8 @@ QUOTE_MAX_CHARS = 180
 
 # Тире здесь не разделитель: «Сон Гоку — один из самых востребованных» это одна фраза,
 # а разрез по тире оставлял обрубок, начинающийся со строчной буквы.
-_SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+|[\n•·]+")
+# Закрывающая кавычка после точки не должна склеивать две фразы в одну
+_SENTENCE_SPLIT = re.compile(r'(?<=[.!?])[»"\']*\s+|[\n•·]+')
 # Приветствие узнаём по началу фразы, контактную обвязку — в любом месте
 _GREETING = re.compile(r"^(меня зовут|приветству|здравствуй|добрый день|привет)", re.I)
 _CONTACT = re.compile(
@@ -310,7 +313,7 @@ def _sentences(text: str) -> list[str]:
     """
     out = []
     for piece in _SENTENCE_SPLIT.split(text):
-        piece = piece.strip(" \t-–—•·")
+        piece = piece.strip(' \t-–—•·«»"\'')
         if _CONTACT.search(piece):
             continue
         if _GREETING.match(piece):
@@ -320,9 +323,6 @@ def _sentences(text: str) -> list[str]:
             piece = tail[1].strip() if len(tail) > 1 else ""
         if len(piece) < 20:
             continue
-        letters = [c for c in piece if c.isalpha()]
-        if letters and sum(c.isupper() for c in letters) / len(letters) > 0.3:
-            continue  # обрывок с КАПСом
         out.append(piece)
     return out
 
@@ -359,7 +359,11 @@ def _quote(description: str, signal: set[str], fallback: set[str] | None = None)
         quote = quote[:QUOTE_MAX_CHARS].rsplit(" ", 1)[0]
     if quote not in description:
         return None
-    # Фрагмент вырван из середины описания, поэтому может начинаться со строчной буквы
+    letters = [c for c in quote if c.isalpha()]
+    if letters and sum(c.isupper() for c in letters) / len(letters) > 0.3:
+        # Описание целиком капсом — не повод остаться без доказательства.
+        # Приводим к обычному виду; дословность проверяется без учёта регистра.
+        quote = quote.lower()
     return quote[0].upper() + quote[1:] if quote[:1].islower() else quote
 
 
@@ -441,56 +445,89 @@ def _score(profile: dict, req: dict) -> tuple[float, dict]:
 def _standouts(profile: dict, peers: list[dict], req: dict) -> list[str]:
     """Чем этот подрядчик отличается от остальных прошедших отбор.
 
-    Без этого все карточки пишутся одним шаблоном «цена, формат, языки, часы»,
-    и на вопрос «почему он выше соседа» ответить нечем.
+    Сначала то, что связано с запросом: клиенту, которому нужен казахский, «единственный
+    с английским» не аргумент. Потом всё остальное.
     """
     if len(peers) < 2:
         return []
-    out = []
+    ranked: list[tuple[int, str]] = []
+
     prices = [p["price_from_kzt"] for p in peers if p["price_from_kzt"]]
     if profile["price_from_kzt"] and prices and profile["price_from_kzt"] == min(prices):
-        out.append(f"самый дешёвый из {len(peers)} подходящих")
+        if len(prices) == len([p for p in prices if p == min(prices)]) == 1 or prices.count(min(prices)) == 1:
+            ranked.append((0, f"дешевле всех подходящих: {_money(profile['price_from_kzt'])}"))
 
+    wanted = req.get("language")
     for language in profile["languages"]:
         if sum(language in p["languages"] for p in peers) == 1:
-            out.append(f"единственный работает на языке: {language}")
+            ranked.append((0 if language == wanted else 1, f"{language} — только здесь"))
 
     if len(profile["event_formats"]) == 1:
-        out.append(f"берёт только формат «{profile['event_formats'][0]}»")
+        ranked.append((0, f"берёт только «{profile['event_formats'][0]}»"))
     elif len(profile["event_formats"]) == min(len(p["event_formats"]) for p in peers):
-        out.append("самая узкая специализация из подходящих")
+        ranked.append((1, "самая узкая специализация из подходящих"))
 
     hours = [p["max_hours"] for p in peers if p["max_hours"] is not None]
     if profile["max_hours"] is not None and hours and profile["max_hours"] == max(hours) and len(set(hours)) > 1:
-        out.append(f"дольше всех на площадке: до {profile['max_hours']} ч")
+        ranked.append((1 if not req.get("duration_hours") else 0,
+                       f"дольше всех на площадке: до {profile['max_hours']} ч"))
 
-    if len(profile["languages"]) == max(len(p["languages"]) for p in peers) and len(profile["languages"]) > 1:
-        out.append(f"больше всех языков: {', '.join(profile['languages'])}")
-    return out[:3]
+    counts = [len(p["languages"]) for p in peers]
+    if len(profile["languages"]) == max(counts) and len(set(counts)) > 1:
+        ranked.append((1, f"больше всех языков: {', '.join(profile['languages'])}"))
+
+    ranked.sort(key=lambda item: item[0])
+    return [text for _, text in ranked][:3]
 
 
-def _keep_unique_standouts(facts_list: list[dict]) -> None:
-    """Оставляет каждой карточке только то, чего нет у соседей, и назначает ведущий факт.
+def _keep_unique_standouts(entries: list[tuple[dict, dict]]) -> None:
+    """Оставляет каждой карточке то, чего нет у соседей, и назначает ведущий факт.
 
-    Экстремум, общий для двоих, ничего не выделяет: две карточки по 900 000 ₸ обе
-    «самые дешёвые из двух», и объяснения начинаются одинаковой фразой. Требование 14
-    должно выполняться кодом, а не надеждой на модель.
+    Экстремум, общий для двоих, ничего не выделяет. А когда уникального признака нет,
+    честнее сравнить с первой карточкой, чем писать «2-й по совокупности условий»:
+    порядковый номер — не факт о подрядчике.
     """
+    if len(entries) < 2:
+        for _, facts in entries:
+            facts["standouts"] = []
+            facts["lead"] = None
+        return
+
     seen: dict[str, int] = {}
-    for facts in facts_list:
+    for _, facts in entries:
         for line in facts.get("standouts", []):
             seen[line] = seen.get(line, 0) + 1
 
+    leader = entries[0][0]
     taken: set[str] = set()
-    for position, facts in enumerate(facts_list, 1):
+    for profile, facts in entries:
         unique = [line for line in facts.get("standouts", []) if seen[line] == 1 and line not in taken]
-        facts["standouts"] = unique
         if unique:
-            taken.add(unique[0])
             facts["lead"] = unique[0]
+            taken.add(unique[0])
+            facts["standouts"] = unique[1:]
         else:
-            # Уникального признака нет — честно говорим о месте в выдаче
-            facts["lead"] = f"{position}-й по совокупности условий из {len(facts_list)} подходящих"
+            facts["lead"] = _difference_from(profile, leader)
+            facts["standouts"] = []
+
+
+def _difference_from(profile: dict, leader: dict) -> str | None:
+    """Чем карточка отличается от первой в выдаче. Это факт, а не порядковый номер."""
+    if profile["id"] == leader["id"]:
+        return None
+    price, lead_price = profile["price_from_kzt"], leader["price_from_kzt"]
+    if price and lead_price and price != lead_price:
+        delta = round(abs(price / lead_price - 1) * 100)
+        if delta:
+            side = "дороже" if price > lead_price else "дешевле"
+            return f"{side} первого на {delta}%: {_money(price)}"
+    hours, lead_hours = profile["max_hours"], leader["max_hours"]
+    if hours is not None and lead_hours is not None and hours != lead_hours:
+        return f"до {hours} ч против {lead_hours} у первого"
+    extra = [l for l in profile["languages"] if l not in leader["languages"]]
+    if extra:
+        return f"добавляет язык: {', '.join(extra)}"
+    return None
 
 
 def _card(profile: dict, score: float, facts: dict) -> dict:
@@ -653,6 +690,7 @@ def search_contractors(
             "in_city_and_category": 0,
             "cards": [],
             "note": f"в городе {req['city']} нет ни одного подрядчика категории «{req['category']}»",
+            "opening": f"В городе {req['city']} нет ни одного подрядчика категории «{req['category']}».",
             "diagnosis": _diagnose(req, requested),
         }
 
@@ -672,19 +710,27 @@ def search_contractors(
     top = scored[:MAX_CARDS]
     for value, facts, profile in top:
         facts["standouts"] = _standouts(profile, passed, req)
-    _keep_unique_standouts([facts for _, facts, _ in top])
+    _keep_unique_standouts([(profile, facts) for _, facts, profile in top])
     cards = [_card(profile, value, facts) for value, facts, profile in top]
 
     busy_now = sum(1 for p in pool if req["date"] in p["busy_dates"])
+    availability = (
+        f"в категории «{req['category']}» по городу {req['city']} всего {len(pool)}, "
+        f"на {_human_date(req['date'])} заняты {busy_now}"
+    )
     result = {
         "outcome": "matched" if cards else "all_filtered_out",
         "request": req,
         "in_city_and_category": len(pool),
         "passed_filters": len(passed),
         # Требование 16: разницу между датами видно и тогда, когда карточек всё равно три
-        "availability_note": (
-            f"в категории «{req['category']}» по городу {req['city']} всего {len(pool)}, "
-            f"на {_human_date(req['date'])} заняты {busy_now}"
+        "availability_note": availability,
+        # Готовая первая строка ответа. Собрана кодом по той же причине, что и подсказки:
+        # когда модель сочиняет её сама, она то берёт запрос в кавычки, то теряет занятость.
+        "opening": (
+            f"Нашлось {_people(len(cards))}. {availability[0].upper()}{availability[1:]}"
+            if cards
+            else f"Подходящих не нашлось. {availability[0].upper()}{availability[1:]}"
         ),
         "cards": cards,
         "rejected": rejected[:MAX_REJECTED_SHOWN],
@@ -833,7 +879,9 @@ def _suggestions(req: dict, relaxed: dict, nearby: list[dict], budget_needed: in
                 "ни одно одиночное послабление не помогает: кандидаты не проходят "
                 "сразу по нескольким условиям"
             )
-    out += _elsewhere_note(req)
+    if not passed_now:
+        # Когда карточки есть, совет ехать в другой город — шум
+        out += _elsewhere_note(req)
     return out
 
 
