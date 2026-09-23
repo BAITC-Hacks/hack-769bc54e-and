@@ -174,13 +174,18 @@ class ContractorDomainTests(TestCase):
     def search(self, **over):
         return self.m.search_contractors(self.ctx, **dict(self.base, **over))
 
-    def test_options_are_derived_from_the_catalog(self):
-        data = Client().get("/api/options").json()
-        self.assertEqual(set(data), {"cities", "categories", "event_formats", "languages"})
-        self.assertEqual(data["cities"], sorted({p["city"] for p in self.m.catalog()}, key=str.casefold))
-        self.assertIn("Ведущий", data["categories"])
-        self.assertIn("той", data["event_formats"])
-        self.assertIn("казахский", data["languages"])
+    def test_options_come_from_the_domain_vocabulary(self):
+        expected = {
+            "cities": ["Тестовый город"],
+            "categories": ["Тестовая категория"],
+            "event_formats": ["тестовый формат"],
+            "languages": ["тестовый язык"],
+        }
+        with patch.object(self.m, "vocabulary", return_value=expected) as vocabulary:
+            data = Client().get("/api/options").json()
+
+        self.assertEqual(data, expected)
+        vocabulary.assert_called_once_with()
 
     def test_catalog_has_66_profiles(self):
         self.assertEqual(len(self.m.catalog()), 66)  # R20

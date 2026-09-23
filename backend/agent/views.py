@@ -56,34 +56,11 @@ def samples(request):
 
 @require_GET
 def options(request):
-    """Return form dictionaries derived from the active domain catalog."""
-    catalog = getattr(domains.active(), "catalog", None)
-    if not callable(catalog):
-        return JsonResponse({"error": "active domain does not provide catalog options"}, status=404)
-
-    profiles = catalog()
-
-    def unique(field):
-        values = {
-            value
-            for profile in profiles
-            for value in (
-                profile.get(field, [])
-                if isinstance(profile.get(field), (list, tuple, set, frozenset))
-                else [profile.get(field)]
-            )
-            if value
-        }
-        return sorted(values, key=str.casefold)
-
-    return JsonResponse(
-        {
-            "cities": unique("city"),
-            "categories": unique("categories"),
-            "event_formats": unique("event_formats"),
-            "languages": unique("languages"),
-        }
-    )
+    """Return the form vocabulary declared by the active domain."""
+    vocabulary = getattr(domains.active(), "vocabulary", None)
+    if not callable(vocabulary):
+        return JsonResponse({"error": "active domain does not provide a vocabulary"}, status=404)
+    return JsonResponse(vocabulary())
 
 
 @require_POST
