@@ -1,0 +1,198 @@
+/* Токены. Меняйте здесь — поменяется весь интерфейс. */
+:root {
+  --paper: #e9edf2;
+  --surface: #f8fafc;
+  --ink: #14213d;
+  --muted: #5b6b82;
+  --line: #c5ceda;
+  --gate: #e8a33d;
+  --gate-soft: #fdf3df;
+  --threat: #b93a32;
+  --clear: #1f7a6c;
+  --sans: "Golos Text", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Menlo, monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 16px/1.55 var(--sans);
+}
+
+h1, h2, p { margin: 0; }
+
+.shell {
+  display: grid;
+  grid-template-columns: minmax(320px, 440px) minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+/* ---------- Левая колонка: постановка задачи ---------- */
+.brief {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  max-height: 100vh;
+  overflow-y: auto;
+  padding: 40px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.brief h1 { font-size: 2.6rem; font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
+.lede { margin-top: 12px; color: var(--muted); max-width: 38ch; }
+
+.samples { margin: 22px 0 8px; font-size: 0.875rem; color: var(--muted); }
+.samples > div { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+
+.chip {
+  font: 500 0.875rem var(--sans);
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+.chip:hover { border-color: var(--ink); }
+
+label { font-size: 0.875rem; font-weight: 600; margin-top: 10px; }
+
+textarea {
+  width: 100%;
+  resize: vertical;
+  padding: 12px 14px;
+  font: 400 1rem/1.5 var(--sans);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+textarea.mono { font: 400 0.8125rem/1.6 var(--mono); white-space: pre; overflow-x: auto; }
+
+.btn {
+  font: 600 1rem var(--sans);
+  border: 0;
+  border-radius: 6px;
+  padding: 12px 20px;
+  cursor: pointer;
+}
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-primary { margin-top: 14px; background: var(--ink); color: var(--surface); }
+.btn-approve { background: var(--ink); color: var(--surface); }
+.btn-quiet { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+
+:is(button, textarea, summary):focus-visible { outline: 3px solid var(--gate); outline-offset: 2px; }
+
+.error { color: var(--threat); font-weight: 500; }
+.meta { font-size: 0.8125rem; color: var(--muted); }
+
+/* ---------- Правая колонка: журнал ---------- */
+.case {
+  background: var(--surface);
+  border-left: 1px solid var(--line);
+  padding: 40px clamp(20px, 5vw, 64px) 96px;
+}
+
+.empty { max-width: 46ch; margin-top: 18vh; color: var(--muted); }
+.empty h2 { color: var(--ink); font-size: 1.5rem; margin-bottom: 8px; }
+
+.status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
+  padding-bottom: 20px;
+  margin-bottom: 28px;
+  border-bottom: 1px solid var(--line);
+}
+.status strong { font-size: 1.25rem; }
+.status span { color: var(--muted); }
+.status-awaiting_approval strong { color: #9a6408; }
+.status-done strong { color: var(--clear); }
+.status-failed strong { color: var(--threat); }
+
+/* Журнал — вертикальная нить с узлами. Узел = одно решение или действие агента. */
+.journal { list-style: none; margin: 0; padding: 0; max-width: 78ch; }
+
+.step {
+  position: relative;
+  padding: 0 0 26px 30px;
+  border-left: 2px solid var(--line);
+  margin-left: 6px;
+}
+.step:last-child { border-left-color: transparent; }
+.step::before {
+  content: "";
+  position: absolute;
+  left: -7px;
+  top: 5px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--muted);
+}
+.step-tool_call::before { background: var(--ink); border-color: var(--ink); border-radius: 2px; }
+.step-approval::before, .step-gate::before { background: var(--gate); border-color: var(--gate); }
+.step-final::before { background: var(--clear); border-color: var(--clear); }
+.step-error::before { background: var(--threat); border-color: var(--threat); }
+
+.step-kind { display: block; font-size: 0.8125rem; color: var(--muted); margin-bottom: 4px; }
+.step-text { max-width: 68ch; }
+
+.data {
+  margin: 0;
+  padding: 12px 14px;
+  font: 400 0.8125rem/1.6 var(--mono);
+  background: var(--paper);
+  border-radius: 6px;
+  overflow-x: auto;
+}
+
+details summary { cursor: pointer; font-size: 0.9375rem; color: var(--muted); width: fit-content; }
+details[open] summary { margin-bottom: 8px; }
+
+/* Главный момент интерфейса: агент остановился и ждёт человека. */
+.gate {
+  margin-top: 12px;
+  padding: 20px 22px;
+  background: var(--gate-soft);
+  border-left: 6px solid var(--gate);
+  border-radius: 0 6px 6px 0;
+}
+.gate p { font-weight: 500; max-width: 60ch; }
+.gate-actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+
+.step-pending .step-kind { animation: pulse 1.4s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: 0.35; } }
+
+.report { max-width: 70ch; }
+.report h1, .report h2, .report h3 { font-size: 1.125rem; margin: 18px 0 6px; }
+.report :first-child { margin-top: 0; }
+.report p, .report ul, .report ol { margin: 0 0 10px; }
+.report ul, .report ol { padding-left: 22px; }
+.report code { font: 0.875em var(--mono); background: var(--paper); padding: 1px 5px; border-radius: 4px; }
+.report pre { background: var(--paper); padding: 12px 14px; border-radius: 6px; overflow-x: auto; }
+.report pre code { background: none; padding: 0; }
+
+@media (max-width: 860px) {
+  .shell { grid-template-columns: 1fr; }
+  .brief { position: static; max-height: none; padding: 28px 20px; }
+  .case { border-left: 0; border-top: 1px solid var(--line); padding-top: 28px; }
+  .empty { margin-top: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .step-pending .step-kind { animation: none; }
+}
+
+.status .tokens {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
