@@ -1,9 +1,21 @@
 "use client";
 
 import ReactMarkdown from "react-markdown";
-import { RESULTS } from "@/lib/brand";
+import { HONESTY_TEXT, RESULTS } from "@/lib/brand";
 import { EMPTY_REPORT, explanations, factsLine, findSearchResult, kzt, parseReport, quoteText } from "@/lib/results";
 import type { ContractorCard, Run } from "@/lib/types";
+
+function HonestyBadges({ card }: { card: ContractorCard }) {
+  return (
+    <div className="honesty-badges" aria-label={HONESTY_TEXT.sectionLabel}>
+      <span className={`honesty-badge ${card.flags.synthetic ? "honesty-badge-team" : "honesty-badge-source"}`}>
+        {card.flags.synthetic ? HONESTY_TEXT.syntheticProfile : HONESTY_TEXT.sourceProfile}
+      </span>
+      {card.flags.price_imputed && <span className="honesty-badge honesty-badge-estimate">{HONESTY_TEXT.imputedPrice}</span>}
+      {card.flags.city_imputed && <span className="honesty-badge honesty-badge-estimate">{HONESTY_TEXT.imputedCity}</span>}
+    </div>
+  );
+}
 
 function Card({ card, text, writing }: { card: ContractorCard; text: string | null; writing: boolean }) {
   return (
@@ -17,6 +29,7 @@ function Card({ card, text, writing }: { card: ContractorCard; text: string | nu
       <p className="card-meta">
         {card.categories.join(" · ")} · {card.city}
       </p>
+      <HonestyBadges card={card} />
       {text ? (
         <div className="card-why">
           <ReactMarkdown>{text}</ReactMarkdown>

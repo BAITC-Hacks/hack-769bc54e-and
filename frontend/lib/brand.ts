@@ -101,3 +101,11 @@ export const STATUS_TEXT: Record<RunStatus, string> = {
   done: "Завершено",
   failed: "Остановлено с ошибкой",
 };
+
+export const HONESTY_TEXT = {
+  sectionLabel: "Происхождение данных подрядчиков",
+  sourceProfile: "Исходный профиль",
+  syntheticProfile: "Добавлен командой",
+  imputedPrice: "Цена ориентировочная",
+  imputedCity: "Город указан командой",
+} as const;

@@ -33,6 +33,12 @@ export interface ContractorOptions {
   languages: string[];
 }
 
+export interface ContractorFlags {
+  synthetic: boolean;
+  price_imputed: boolean;
+  city_imputed: boolean;
+}
+
 export interface Health {
   ok: boolean;
   mock: boolean;
@@ -67,7 +73,7 @@ export interface ContractorCard {
   description: string;
   score: number;
   match: CardMatch;
-  flags: { synthetic: boolean; price_imputed: boolean; city_imputed: boolean };
+  flags: ContractorFlags;
 }
 
 export interface SearchResult {
