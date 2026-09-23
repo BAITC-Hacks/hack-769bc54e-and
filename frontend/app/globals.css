@@ -97,6 +97,8 @@ textarea.mono { font: 400 0.8125rem/1.6 var(--mono); white-space: pre; overflow-
 
 /* ---------- Правая колонка: журнал ---------- */
 .case {
+  /* min-width: 0 — иначе длинный JSON в журнале растягивает колонку шире экрана */
+  min-width: 0;
   background: var(--surface);
   border-left: 1px solid var(--line);
   padding: 40px clamp(20px, 5vw, 64px) 96px;
@@ -261,3 +263,30 @@ details[open] summary { margin-bottom: 8px; }
 .request .error { margin-top: 8px; }
 :is(input, select):focus-visible { outline: 3px solid var(--gate); outline-offset: 2px; }
 @media (max-width: 480px) { .request { grid-template-columns: 1fr; } }
+
+/* ---------- Карточки подбора ---------- */
+.results { max-width: 78ch; margin-bottom: 36px; }
+.results h2 { font-size: 1.375rem; letter-spacing: -0.01em; }
+.results-count { margin: 4px 0 14px; color: var(--muted); font-size: 0.9375rem; font-variant-numeric: tabular-nums; }
+.results-text { margin: 0 0 14px; }
+.cards { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 12px; counter-reset: card; }
+.card {
+  counter-increment: card;
+  padding: 18px 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--clear);
+  border-radius: 8px;
+}
+.card-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; }
+.card-name { font-size: 1.1875rem; font-weight: 700; }
+.card-name::before { content: counter(card) ". "; color: var(--muted); font-weight: 500; }
+.card-price { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.card-meta { margin-top: 2px; color: var(--muted); font-size: 0.875rem; }
+.card-why { margin-top: 10px; max-width: 68ch; }
+.card-why p + p { margin-top: 4px; }
+.card-pending { color: var(--muted); animation: pulse 1.4s ease-in-out infinite; }
+.card-note { font-size: 0.8125rem; color: var(--muted); }
+.card-quote { margin: 12px 0 0; padding: 8px 0 8px 14px; border-left: 2px solid var(--line); }
+.card-quote figcaption { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.card-quote blockquote { margin: 2px 0 0; font-size: 0.9375rem; font-style: italic; }
